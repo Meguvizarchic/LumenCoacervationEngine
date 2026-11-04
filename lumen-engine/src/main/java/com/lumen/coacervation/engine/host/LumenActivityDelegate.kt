@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
-import android.graphics.drawable.StateListDrawable
 import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
@@ -268,19 +267,8 @@ public class LumenActivityDelegate @JvmOverloads constructor(
     }
 
     /** 控件描边：聚焦/按下时加粗加深。供可选模块 `lumen-controls` 与宿主自定义控件复用。 */
-    public fun controlOutline(radiusDp: Float, emphasized: Boolean = false): Drawable {
-        fun border(active: Boolean) = GradientDrawable().apply {
-            cornerRadius = radiusDp * density
-            setColor(Color.TRANSPARENT)
-            setStroke(((if (active) 2f else 1f) * density).toInt().coerceAtLeast(1),
-                ColorUtils.setAlphaComponent(palette.primary, if (active || emphasized) 0x72 else 0x22))
-        }
-        return ViewportForegroundDrawable(StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_focused), border(true))
-            addState(intArrayOf(android.R.attr.state_pressed), border(true))
-            addState(intArrayOf(), border(false))
-        })
-    }
+    public fun controlOutline(radiusDp: Float, emphasized: Boolean = false): Drawable =
+        LumenControlOutline.create(density, palette.primary, radiusDp, emphasized)
 
     // ---------------- 回弹（适配标准 §5.4） ----------------
 

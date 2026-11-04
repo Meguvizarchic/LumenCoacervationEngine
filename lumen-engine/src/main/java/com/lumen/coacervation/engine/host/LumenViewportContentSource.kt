@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.annotation.MainThread
 import com.lumen.coacervation.engine.geometry.LocalViewDrawing
+import com.lumen.coacervation.engine.geometry.SamplingMatrixMath
 import com.lumen.coacervation.engine.geometry.ViewSamplingMatrix
 import com.lumen.coacervation.engine.geometry.ViewportSamplingBounds
 
@@ -40,6 +41,10 @@ public class LumenViewportContentSource(
     private val proxyMatrix = Matrix()
     private val matrix = Matrix()
     private val matrixValues = FloatArray(9)
+    private val viewGlobal = FloatArray(9)
+    private val targetGlobal = FloatArray(9)
+    private val targetInverse = FloatArray(9)
+    private val boundsValues = FloatArray(4)
     private val region = RectF()
     private val bounds = ViewportSamplingBounds()
     private var versionSignature = 0L
@@ -51,7 +56,11 @@ public class LumenViewportContentSource(
             mixVersion(bounds.right.toLong()); mixVersion(bounds.bottom.toLong())
             // Isolated background sources remain authoritative: the injected surfaces may dirty
             // their owner without changing the pixels supplied by the custom source.
-            if (versioned == null || !source.excludesSurfaces) visitVersion(content, 0)
+            if (versioned == null || !source.excludesSurfaces) {
+                // 目标（坐标视图）的全局矩阵与逆矩阵每次快照只求一次；逐 View 只剩自己那一步的乘法。
+                if (mapping.localToScreen(coordinateView, targetGlobal) &&
+                    SamplingMatrixMath.invert(targetGlobal, targetInverse)) visitVersion(content, 0)
+            }
             versionSignature and Long.MAX_VALUE
         }
     }
@@ -104,11 +113,24 @@ public class LumenViewportContentSource(
 
     private fun mixVersion(value: Long) { versionSignature = versionSignature * 31L + value }
 
+    /**
+     * 每次会话 pre-draw 都会走完整棵可见子树。逐 View 的矩阵留在 FloatArray 上：不再逐个重求目标逆矩阵，
+     * 也不经 `Matrix.setValues` / `mapRect` / `getValues` 三次 JNI（均为 @FastNative，各带 9 次逐元素拷贝）。
+     * 混入签名的 9 个值与原先 `getValues` 读回的逐位相同（同一次 inverse·global 乘法，scale=1 不改位）。
+     */
     private fun visitVersion(view: View, depth: Int) {
         if (depth >= 128 || view.visibility != View.VISIBLE || view.alpha <= 0f ||
-            !mapping.sourceToTarget(view, coordinateView, matrix)) return
-        region.set(0f, 0f, view.width.toFloat(), view.height.toFloat())
-        matrix.mapRect(region)
+            !mapping.localToScreen(view, viewGlobal) || !SamplingMatrixMath.isFinite(viewGlobal)) return
+        SamplingMatrixMath.multiply(targetInverse, viewGlobal, matrixValues)
+        if (!SamplingMatrixMath.isFinite(matrixValues)) return
+        if (SamplingMatrixMath.mapBounds(matrixValues, view.width.toFloat(), view.height.toFloat(), boundsValues)) {
+            region.set(boundsValues[0], boundsValues[1], boundsValues[2], boundsValues[3])
+        } else {
+            // 透视矩阵：交给 Skia 按原路径求包围盒。
+            matrix.setValues(matrixValues)
+            region.set(0f, 0f, view.width.toFloat(), view.height.toFloat())
+            matrix.mapRect(region)
+        }
         val intersects = region.intersects(0f, 0f, coordinateView.width.toFloat(), coordinateView.height.toFloat())
         if (!intersects && (view !is ViewGroup || view.clipChildren)) return
         mixVersion(System.identityHashCode(view).toLong())
@@ -116,7 +138,6 @@ public class LumenViewportContentSource(
         mixVersion(view.scrollX.toLong()); mixVersion(view.scrollY.toLong()); mixVersion(view.alpha.toBits().toLong())
         // A hardware ViewGroup can remain clean while only its retained descendant is dirty.
         mixVersion(if (view.isDirty) view.drawingTime.coerceAtLeast(0L) else -1L)
-        matrix.getValues(matrixValues)
         for (value in matrixValues) mixVersion(value.toBits().toLong())
         if (view is ViewGroup) for (index in 0 until view.childCount) visitVersion(view.getChildAt(index), depth + 1)
     }

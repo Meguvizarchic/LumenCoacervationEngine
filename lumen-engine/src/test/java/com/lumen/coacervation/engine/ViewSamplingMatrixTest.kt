@@ -129,4 +129,34 @@ class ViewSamplingMatrixTest {
         assertTrue(helper.contains("parent?.scrollY"))
         assertFalse(helper.contains(".transformMatrixToGlobal("))
     }
+
+    /** 纯 Kotlin 包围盒与逐角映射一致；透视矩阵交还给 Skia。 */
+    @Test fun mapBoundsMatchesCornerMappingForAffineAndRejectsPerspective() {
+        val out = FloatArray(4)
+        val cases = listOf(identity(), transform(12.5f, -3f), transform(4f, 9f, sx = 1.07f, sy = 0.92f, px = 40f, py = 20f),
+            transform(-7f, 2f, sx = -1f), transform(0f, 0f, degrees = 3.5f, px = 60f, py = 24f),
+            transform(30f, 30f, sx = 0.8f, sy = 1.2f, degrees = 135f))
+        for (m in cases) {
+            assertTrue(SamplingMatrixMath.mapBounds(m, 120f, 48f, out))
+            val corners = listOf(map(m, 0f, 0f), map(m, 120f, 0f), map(m, 0f, 48f), map(m, 120f, 48f))
+            assertEquals(corners.minOf { it.first }, out[0], 1e-3f); assertEquals(corners.minOf { it.second }, out[1], 1e-3f)
+            assertEquals(corners.maxOf { it.first }, out[2], 1e-3f); assertEquals(corners.maxOf { it.second }, out[3], 1e-3f)
+        }
+        // 只有平移与缩放时与 Skia 的乘加快路径同序运算，结果逐位确定。
+        assertTrue(SamplingMatrixMath.mapBounds(transform(0.5f, 0.25f), 20f, 20f, out))
+        assertArrayEquals(floatArrayOf(0.5f, 0.25f, 20.5f, 20.25f), out, 0f)
+        assertFalse(SamplingMatrixMath.mapBounds(floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0.001f, 0f, 1f), 10f, 10f, out))
+    }
+
+    /** 版本签名的逐 View 路径不再经 Matrix JNI，目标逆矩阵每次快照只求一次。 */
+    @Test fun viewportVersionTraversalStaysOnFloatArrays() {
+        val source = SourceContract.read("host/LumenViewportContentSource.kt")
+        val visit = source.after("private fun visitVersion(").before("private val consumeRegion")
+        assertTrue(visit.contains("SamplingMatrixMath.multiply(targetInverse, viewGlobal, matrixValues)"))
+        assertTrue(visit.contains("SamplingMatrixMath.mapBounds("))
+        assertFalse(visit.contains("sourceToTarget("))
+        assertFalse(visit.contains("getValues("))
+        val snapshot = source.after("private val snapshotVersion").before("private var unsafe")
+        assertTrue(snapshot.contains("SamplingMatrixMath.invert(targetGlobal, targetInverse)"))
+    }
 }

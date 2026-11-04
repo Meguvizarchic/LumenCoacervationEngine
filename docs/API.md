@@ -71,6 +71,23 @@
 | 诊断 | `val isLiquidRequested`、`val isLiquidEffective`、`val backendName: String?`、`fun diagnostics(): SkinSessionDiagnostics?` | §3.2 |
 | 生命周期 | `onStart()`、`onStop()`、`onTrimMemory(level)`、`onLowMemory()`、`onDestroy()` | §2.1 |
 
+### 独立控件描边与视口前景（未发布）
+
+宿主使用自己的 Activity 基类或配色、不经 `LumenActivityDelegate` 时，用这两个入口代替复制引擎代码。`controlOutline()` 现在就是对 `LumenControlOutline.create` 的委托，两者像素相同。
+
+| 声明 | 说明 |
+|---|---|
+| `LumenControlOutline.create(context: Context, accentColor: Int, radiusDp: Float, emphasized: Boolean = false): Drawable`（`@JvmStatic @JvmOverloads`） | 与 `controlOutline()` 同一结构：常态 1dp、聚焦/按下 2dp，alpha 0x22 / 0x72（`emphasized` 时常态也取 0x72），颜色取 `accentColor` 的 RGB；已按视口前景包装 |
+| `LumenViewportForeground.wrap(drawable: Drawable): Drawable`（`@JvmStatic`） | 让任意前景装饰固定在所属 View 的视口：只在它（可经 `RippleDrawable` 等容器间接持有）真正是 `View.foreground` 时补偿有符号 `scrollX/scrollY`，挂在背景上原样绘制；已包装的原样返回，逐帧不分配 |
+
+```kotlin
+// 自有基类、Monet 配色：一行替代私有的描边与包装类拷贝
+input.foreground = LumenControlOutline.create(this, monetColors.primary, radiusDp = 14f)
+button.foreground = RippleDrawable(rippleColor, LumenControlOutline.create(this, accent, 20f, emphasized = true), mask)
+// 自定义前景装饰
+view.foreground = LumenViewportForeground.wrap(myFocusRing)
+```
+
 ### 控件软阴影（自 1.5.0）
 
 浅色主题下浅色表面与白底内容分不清边时启用；色罩与白色描边在浅底上会消失，阴影不依赖它们。环境层（1.6× 模糊半径的宽幅高斯尾）与贴边接触带按到控件轮廓的距离场烘焙成连续剖面，**只画在控件边界之外**，控件边缘保持自己的干净轮廓；纯软件位图缓存，API 27+ 可用，与高级材质无关。祖先容器需 `clipChildren=false` 或按 `outsetPx` 预留外侧间距（密集列表项天然会被裁掉，通常正是想要的效果）。

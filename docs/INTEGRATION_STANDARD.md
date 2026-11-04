@@ -270,7 +270,7 @@
 - **可滚动输入框**：`controlOutline()` 作为前景安装时按实际所属 View 的有符号 `scrollX/scrollY` 补偿，只固定描边坐标；原生文本滚动、光标、选区及 padding 不由引擎接管。已有背景继续使用框架自己的滚动补偿，宿主不需要新增滚动监听。
 - **自定义控件**：宿主自己的开关或复选框：
   - **应当**用 `LiquidChoiceDrawable` 画轨道、滑块或勾选框；
-  - 焦点和按压描边用 `controlOutline()`；
+  - 焦点和按压描边用 `controlOutline()`；不经委托、使用宿主自己配色的基类**应当**用 `LumenControlOutline.create(context, accent, radiusDp)`，自定义前景装饰用 `LumenViewportForeground.wrap(drawable)`，不要复制引擎的描边或视口补偿实现（未发布）；
   - 取色**必须**来自 `LumenPalette`，不得引入新的色源；
   - 替换控件的 Drawable 之后，**必须**调用 `refreshDrawableState()`。否则新 Drawable 会停在默认状态，直到下一次按压才显示正确的选中态。
 

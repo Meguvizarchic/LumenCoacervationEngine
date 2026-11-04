@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### 新增
+
+- `LumenControlOutline.create(context, accentColor, radiusDp, emphasized = false)` 与 `LumenViewportForeground.wrap(drawable)`：不经 `LumenActivityDelegate` 的控件描边与视口前景包装。宿主自有基类与配色此前只能复制 `controlOutline` 与内部的 `ViewportForegroundDrawable`（BIL PR #41 即为此复制了一份）；`LumenActivityDelegate.controlOutline` 现委托给同一实现，像素不变。设备用例 `InputOutlineScrollTest.standalonePublicOutlineKeepsItsPlaceAtSignedScrollOffsets`，JVM 契约 `ControlOutlineContractTest`。
+
+### 性能
+
+- `LumenViewportContentSource.contentVersion`：每次会话 pre-draw 遍历可见子树时，目标逆矩阵每次快照只求一次，逐 View 不再经 `Matrix.setValues` / `mapRect` / `getValues` 三次 JNI，可见性裁剪改用与 `SkMatrix::mapRect` 同分支的纯 Kotlin 包围盒（`SamplingMatrixMath.mapBounds`，透视矩阵仍交给 Skia）。签名值逐位不变。设备基准 `ViewportVersionBenchmarkTest`（241 个 View、表面覆盖整个来源，400 次读取，同一设备前后 APK 各 3 轮）：Xiaomi 2210132C（API 33）单次读取 p50 212–223µs → 109–130µs，p90 231–278µs → 125–147µs。
+
 ## [1.6.1] - 2026-10-30
 
 九个库模块（`lumen-*`）的源码与 1.6.0 相同，本版只修复演示 Sample 与设备测试。1.6.0 的 tag 不可移动，且该版发布时没有走库附件与演示包流水线（Release 没有任何附件），所以修复以 1.6.1 发出。

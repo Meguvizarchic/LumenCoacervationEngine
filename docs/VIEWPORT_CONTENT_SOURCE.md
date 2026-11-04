@@ -35,6 +35,14 @@ mapper 读取代理 matrix 时递归复用同一组 scratch 数组。屏幕上�
 而形成常驻录制循环；普通源保留 dirty/drawingTime 及自身滚动签名。代理 dirty 不参与版本，
 相同 geometry 不重复 layout，也不安装或投递常驻帧回调。
 
+contentVersion 在每次会话 pre-draw 被读取并遍历可见子树（未发布的性能修订）：坐标视图的全局矩阵与逆矩阵
+每次快照只求一次；逐 View 的 inverse·global 乘积留在 FloatArray 上，可见性裁剪用纯 Kotlin 包围盒
+（`SamplingMatrixMath.mapBounds`，分支与 `SkMatrix::mapRect` 一致，透视矩阵退回 `Matrix.mapRect`），
+不再逐 View 经 `Matrix.setValues/mapRect/getValues` 三次 @FastNative JNI。混入签名的 9 个值与原实现逐位相同；
+裁剪判断与 Skia 的差别至多在末位舍入，只影响恰好压在视口边缘的 View 是否计入签名。
+设备基准 `ViewportVersionBenchmarkTest`（241 个 View，Xiaomi 2210132C API 33，前后各 3 轮）：单次读取 p50
+212–223µs → 109–130µs；该数字只描述这台设备与该夹具。
+
 JVM 回归覆盖区域并集、边界裁剪、向外取整、连续移动及上述矩阵等式；源码契约保护 overlay
 可见性、软件探针、依赖和关闭出口。sample Android 回归覆盖 owner 可见性与恢复、带自身滚动
 及偏移/缩放/旋转的像素等价、使用引擎矩阵把裁剪源画回 owner、原生探针与自定义源分离、

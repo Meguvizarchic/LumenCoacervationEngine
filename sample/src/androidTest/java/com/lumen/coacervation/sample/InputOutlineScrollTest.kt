@@ -23,8 +23,10 @@ class InputOutlineScrollTest {
 
     @Test fun longSingleLineInputKeepsItsOutlineAtBothSignedScrollOffsets() = runCase(multiline = false)
     @Test fun longMultilineInputKeepsItsOutlineWhileTheCursorScrollsVertically() = runCase(multiline = true)
+    /** 宿主自有配色、不经委托的公开描边（`LumenControlOutline.create`）走同一套视口固定。 */
+    @Test fun standalonePublicOutlineKeepsItsPlaceAtSignedScrollOffsets() = runCase(multiline = false, standalone = true)
 
-    private fun runCase(multiline: Boolean) {
+    private fun runCase(multiline: Boolean, standalone: Boolean = false) {
         ActivityScenario.launch(SurfaceSandboxActivity::class.java).use { scenario ->
             lateinit var activity: SurfaceSandboxActivity
             lateinit var input: EditText
@@ -54,6 +56,8 @@ class InputOutlineScrollTest {
                     })
                 })
                 LumenControls.style(input, lumen)
+                if (standalone) input.foreground = com.lumen.coacervation.engine.host.LumenControlOutline.create(
+                    activity, LumenPalette.neutral(false).primary, 14f)
                 // Isolate the outline pixels from the material's own border and optical background.
                 input.background = ColorDrawable(Color.rgb(24, 24, 24))
                 input.requestFocus()

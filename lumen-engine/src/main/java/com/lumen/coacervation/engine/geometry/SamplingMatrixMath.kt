@@ -35,6 +35,31 @@ internal object SamplingMatrixMath {
         out[6] = g; out[7] = h; out[8] = i
     }
 
+    /**
+     * 把 (0,0,width,height) 经仿射 [matrix] 映射后的包围盒按 left, top, right, bottom 写入 [out]，与 `SkMatrix::mapRect` 的分支一致：
+     * 只有缩放与平移时按两角乘加再排序，含旋转或错切时取四角包围盒。透视矩阵返回 false，调用方退回
+     * `Matrix.mapRect`。纯函数，不经 JNI；用于逐 View 的可见性裁剪，与 Skia 的差别至多在末位舍入。
+     */
+    fun mapBounds(matrix: FloatArray, width: Float, height: Float, out: FloatArray): Boolean {
+        if (matrix[6] != 0f || matrix[7] != 0f || matrix[8] != 1f) return false
+        val sx = matrix[0]; val kx = matrix[1]; val tx = matrix[2]
+        val ky = matrix[3]; val sy = matrix[4]; val ty = matrix[5]
+        if (kx == 0f && ky == 0f) {
+            val x0 = tx; val x1 = width * sx + tx
+            val y0 = ty; val y1 = height * sy + ty
+            out[0] = minOf(x0, x1); out[1] = minOf(y0, y1); out[2] = maxOf(x0, x1); out[3] = maxOf(y0, y1)
+            return true
+        }
+        // 四角：(0,0) (w,0) (0,h) (w,h)。
+        val ax = tx; val ay = ty
+        val bx = sx * width + tx; val by = ky * width + ty
+        val cx = kx * height + tx; val cy = sy * height + ty
+        val dx = sx * width + kx * height + tx; val dy = ky * width + sy * height + ty
+        out[0] = minOf(minOf(ax, bx), minOf(cx, dx)); out[1] = minOf(minOf(ay, by), minOf(cy, dy))
+        out[2] = maxOf(maxOf(ax, bx), maxOf(cx, dx)); out[3] = maxOf(maxOf(ay, by), maxOf(cy, dy))
+        return true
+    }
+
     /** T(dx,dy) * matrix: translate the output space, including perspective matrices. */
     fun translateAfter(matrix: FloatArray, dx: Float, dy: Float) {
         matrix[0] += dx * matrix[6]; matrix[1] += dx * matrix[7]; matrix[2] += dx * matrix[8]
