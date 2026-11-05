@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "profiles": {
+    "fast": {
+      "description": "迭代用：核心与 controls 的 JVM 单测（core 的跨模块契约读取 controls）。不能替代 gate/full。",
+      "steps": [
+        {
+          "id": "unit-core-controls",
+          "argv": [
+            "cmd.exe",
+            "/d",
+            "/c",
+            ".\\gradlew.bat",
+            ":lumen-engine:testDebugUnitTest",
+            ":lumen-controls:testDebugUnitTest",
+            "-Dorg.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8 -Djava.io.tmpdir=C:\\Windows\\Temp",
+            "--console=plain",
+            "--no-daemon"
+          ],
+          "timeout_seconds": 2400
+        }
+      ]
+    },
+    "fast-motion": {
+      "description": "迭代用：lumen-motion JVM 单测（motion 的契约读取 core）。",
+      "steps": [
+        {
+          "id": "unit-motion",
+          "argv": [
+            "cmd.exe",
+            "/d",
+            "/c",
+            ".\\gradlew.bat",
+            ":lumen-motion:testDebugUnitTest",
+            "-Dorg.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8 -Djava.io.tmpdir=C:\\Windows\\Temp",
+            "--console=plain",
+            "--no-daemon"
+          ],
+          "timeout_seconds": 2400
+        }
+      ]
+    },
+    "gate": {
+      "description": "ENGINEERING_RULES §11 构建门禁：四个任务全部通过，Lint 0 错误需另行核对报告。",
+      "steps": [
+        {
+          "id": "gate",
+          "argv": [
+            "cmd.exe",
+            "/d",
+            "/c",
+            ".\\gradlew.bat",
+            "assembleDebug",
+            "testDebugUnitTest",
+            ":sample:testReleaseUnitTest",
+            "lintDebug",
+            "-Dorg.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8 -Djava.io.tmpdir=C:\\Windows\\Temp",
+            "--console=plain",
+            "--no-daemon"
+          ],
+          "timeout_seconds": 5400
+        }
+      ]
+    },
+    "full": {
+      "description": "对齐 .github/workflows/ci.yml 的完整任务图 + 许可证检查 + tools 脚本回归（BUILD_WORKFLOW §4）。",
+      "steps": [
+        {
+          "id": "ci-graph",
+          "argv": [
+            "cmd.exe",
+            "/d",
+            "/c",
+            ".\\gradlew.bat",
+            "assembleDebug",
+            "testDebugUnitTest",
+            ":sample:testReleaseUnitTest",
+            "lintDebug",
+            "bundleReleaseAar",
+            "sourceReleaseJar",
+            ":sample:minifyReleaseWithR8",
+            "-Plumen.verifySampleR8=true",
+            "-Dorg.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8 -Djava.io.tmpdir=C:\\Windows\\Temp",
+            "--console=plain",
+            "--no-daemon"
+          ],
+          "timeout_seconds": 7200
+        },
+        {
+          "id": "notices-lumen-engine",
+          "argv": [
+            "python",
+            "tools/check_third_party_notices.py",
+            "--aar",
+            "lumen-engine/build/outputs/aar/lumen-engine-release.aar",
+            "--sources",
+            "lumen-engine/build/intermediates/source_jar/release/release-sources.jar"
+          ],
+          "timeout_seconds": 300
+        },
+        {
+          "id": "notices-lumen-compose",
+          "argv": [
+            "python",
+            "tools/check_third_party_notices.py",
+            "--aar",
+            "lumen-compose/build/outputs/aar/lumen-compose-release.aar",
+            "--sources",
+            "lumen-compose/build/intermediates/source_jar/release/release-sources.jar"
+          ],
+          "timeout_seconds": 300
+        },
+        {
+          "id": "notices-lumen-effects",
+          "argv": [
+            "python",
+            "tools/check_third_party_notices.py",
+            "--aar",
+            "lumen-effects/build/outputs/aar/lumen-effects-release.aar",
+            "--sources",
+            "lumen-effects/build/intermediates/source_jar/release/release-sources.jar"
+          ],
+          "timeout_seconds": 300
+        },
+        {
+          "id": "notices-lumen-assets",
+          "argv": [
+            "python",
+            "tools/check_third_party_notices.py",
+            "--aar",
+            "lumen-assets/build/outputs/aar/lumen-assets-release.aar",
+            "--sources",
+            "lumen-assets/build/intermediates/source_jar/release/release-sources.jar"
+          ],
+          "timeout_seconds": 300
+        },
+        {
+          "id": "notices-lumen-assets-lottie",
+          "argv": [
+            "python",
+            "tools/check_third_party_notices.py",
+            "--aar",
+            "lumen-assets-lottie/build/outputs/aar/lumen-assets-lottie-release.aar",
+            "--sources",
+            "lumen-assets-lottie/build/intermediates/source_jar/release/release-sources.jar"
+          ],
+          "timeout_seconds": 300
+        },
+        {
+          "id": "notices-lumen-assets-pag",
+          "argv": [
+            "python",
+            "tools/check_third_party_notices.py",
+            "--aar",
+            "lumen-assets-pag/build/outputs/aar/lumen-assets-pag-release.aar",
+            "--sources",
+            "lumen-assets-pag/build/intermediates/source_jar/release/release-sources.jar"
+          ],
+          "timeout_seconds": 300
+        },
+        {
+          "id": "notices-lumen-assets-rive",
+          "argv": [
+            "python",
+            "tools/check_third_party_notices.py",
+            "--aar",
+            "lumen-assets-rive/build/outputs/aar/lumen-assets-rive-release.aar",
+            "--sources",
+            "lumen-assets-rive/build/intermediates/source_jar/release/release-sources.jar"
+          ],
+          "timeout_seconds": 300
+        },
+        {
+          "id": "tools-unittest",
+          "argv": [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tools",
+            "-p",
+            "test_*.py"
+          ],
+          "timeout_seconds": 900
+        }
+      ]
+    },
+    "device-apk": {
+      "description": "构建设备测试用的 sample release 与 androidTest APK；安装与 am instrument 仍按 BUILD_WORKFLOW 手动执行。",
+      "steps": [
+        {
+          "id": "sample-apks",
+          "argv": [
+            "cmd.exe",
+            "/d",
+            "/c",
+            ".\\gradlew.bat",
+            ":sample:assembleRelease",
+            ":sample:assembleReleaseAndroidTest",
+            "-Dorg.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8 -Djava.io.tmpdir=C:\\Windows\\Temp",
+            "--console=plain",
+            "--no-daemon"
+          ],
+          "timeout_seconds": 3600
+        }
+      ]
+    }
+  }
+}

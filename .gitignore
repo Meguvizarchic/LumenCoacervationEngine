@@ -34,3 +34,6 @@ mapping.txt
 .classpath
 .project
 .settings/
+
+# 验证工作流（ucodex）的运行回执与日志
+.codex-workflow/runs/
