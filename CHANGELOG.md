@@ -6,6 +6,11 @@
 
 ### 新增
 
+- `LumenSurfacePresets.card(radiusDp, material)`：卡片角色采样表面的起点，与手写选项逐字段相等（`SurfaceCardPresetTest`）；Sample 材质浓度沙盒的四块玻璃改用它，`MaterialOpacityRegressionTest` 的逐像素断言照常通过。
+- 设备基准 `BindingCallBenchmarkTest`：满载会话（16 个表面）里绑定逐帧调用的主线程耗时，供后续优化对照。曾尝试的按 id 单槽 / 下标缓存在交替访问与设置光源上比线性查找更慢，未并入。
+
+### 新增
+
 - `LumenSurfaceSession.forActivity(activity, palette, options)`：一行创建随 Activity 销毁自动关闭的局部会话，配色默认取当前深浅色的 `LumenPalette.neutral`。关闭发生在 `super.onDestroy()` 内，宿主在 onDestroy 里先关依赖控件的顺序不变；弱持有 Activity，关闭时注销回调。原构造与行为不变。Sample 的 Fluent / 材质浓度 / Prism 沙盒改用它并删去手动 close。
 - `LumenSurfaceOptions.withTint(opacity)`：同时设置 `tintOpacity` 与 `fallbackTintOpacity`（宿主常把两者写成同一个值）。
 - 设备用例 `SurfaceShortcutsTest`（登记为 smoke 必测）：`forActivity`（默认配色）+ `withTint` 与显式构造 + 两参数 copy 的窗口像素逐位相同；Activity 销毁后会话关闭、背景还原、回调注销。

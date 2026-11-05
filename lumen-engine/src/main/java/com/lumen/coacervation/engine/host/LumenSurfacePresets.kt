@@ -13,6 +13,11 @@ public object LumenSurfacePresets {
             sampling = LumenSurfaceSampling(refractionEnabled = false, minIntervalMs = intervalMs,
                 fadeEnabled = true, fadeHold = hold, fadeEnd = end))
 
+    /** 卡片角色的采样表面（未发布）：等价于 `LumenSurfaceOptions(material = material, role = SurfaceRole.CARD, radiusDp = radiusDp)`。 */
+    @JvmStatic @JvmOverloads
+    public fun card(radiusDp: Float = 16f, material: LumenSurfaceMaterial = LumenSurfaceMaterial.FROSTED): LumenSurfaceOptions =
+        LumenSurfaceOptions(material = material, role = SurfaceRole.CARD, radiusDp = radiusDp)
+
     @JvmStatic public fun staticPanel(): LumenSurfaceOptions =
         LumenSurfaceOptions(material = LumenSurfaceMaterial.STATIC, role = SurfaceRole.MODAL,
             radiusDp = 16f, sampling = LumenSurfaceSampling(enabled = false))

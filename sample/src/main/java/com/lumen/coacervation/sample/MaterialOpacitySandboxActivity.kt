@@ -34,10 +34,9 @@ import com.lumen.coacervation.engine.host.LumenSurfaceBinding
 import com.lumen.coacervation.engine.host.LumenSurfaceEnhancements
 import com.lumen.coacervation.engine.host.LumenSurfaceSampling
 import com.lumen.coacervation.engine.host.LumenSurfaceMaterial
-import com.lumen.coacervation.engine.host.LumenSurfaceOptions
+import com.lumen.coacervation.engine.host.LumenSurfacePresets
 import com.lumen.coacervation.engine.host.LumenSurfaceSession
 import com.lumen.coacervation.engine.model.LumenPalette
-import com.lumen.coacervation.engine.model.SurfaceRole
 import com.lumen.coacervation.engine.motion.LumenMaterialOpacityScope
 import com.lumen.coacervation.engine.widget.LumenSlider
 import com.lumen.coacervation.engine.widget.LumenSliderAppearance
@@ -105,20 +104,16 @@ class MaterialOpacitySandboxActivity : Activity() {
         }
 
         session = LumenSurfaceSession.forActivity(this, palette)
-        frosted = session.bind(frostedTile, LumenSurfaceOptions(material = LumenSurfaceMaterial.FROSTED, role = SurfaceRole.CARD,
-            radiusDp = 20f), scene)
-        liquid = session.bind(liquidTile, LumenSurfaceOptions(material = LumenSurfaceMaterial.LIQUID, role = SurfaceRole.CARD,
-            radiusDp = 20f), scene)
+        frosted = session.bind(frostedTile, LumenSurfacePresets.card(20f), scene)
+        liquid = session.bind(liquidTile, LumenSurfacePresets.card(20f, LumenSurfaceMaterial.LIQUID), scene)
         fluent = LumenFluentControl(fluentTile, palette, session = session, source = scene)
         prism = LumenPrismGlass(prismTile, palette, LumenPrismOptions(cornerRadiusDp = 20f), session, scene)
         // Press effect routes this binding through the direct AGSL program (three-input blur interpolation).
         // A large 32dp blur exercises the capped ring blur of the synthesised middle level.
-        direct = session.bind(directTile, LumenSurfaceOptions(material = LumenSurfaceMaterial.FROSTED, role = SurfaceRole.CARD,
-            radiusDp = 20f, sampling = LumenSurfaceSampling(blurRadiusDp = 32f)), scene,
+        direct = session.bind(directTile, LumenSurfacePresets.card(20f).copy(sampling = LumenSurfaceSampling(blurRadiusDp = 32f)), scene,
             LumenSurfaceEnhancements(press = LumenLocalPressOptions(enabled = true)))
         // Forced software backend: cross-fades while dragging, resamples at the real radius once settled.
-        software = session.bind(softwareTile, LumenSurfaceOptions(material = LumenSurfaceMaterial.FROSTED, role = SurfaceRole.CARD,
-            radiusDp = 20f, sampling = LumenSurfaceSampling(backend = LumenSurfaceBackend.SOFTWARE)), scene)
+        software = session.bind(softwareTile, LumenSurfacePresets.card(20f).copy(sampling = LumenSurfaceSampling(backend = LumenSurfaceBackend.SOFTWARE)), scene)
         mica = LumenMicaBackdrop(micaTile, palette)
         prepareMicaImage()
         scene.setOnScrollChangeListener { v, _, _, _, _ -> session.notifyScrollPositionChanged(v) }

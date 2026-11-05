@@ -324,6 +324,7 @@ view.foreground = LumenViewportForeground.wrap(myFocusRing)
 
 - LumenSurfaceSession(context, palette, options)：不接管根/窗口/输入、不读写偏好的AutoCloseable会话。
 - `LumenSurfaceSession.forActivity(activity, palette = LumenPalette.neutral(Activity 当前深浅色), options = LumenSurfaceSessionOptions())`（`@JvmStatic @JvmOverloads`，未发布）：同一构造，另在 Activity 销毁时自动 close（发生在 `super.onDestroy()` 内，晚于宿主 onDestroy 里关闭依赖控件的代码）；弱持有 Activity，close 时注销回调；已销毁的 Activity 返回已关闭的会话。手动 close 照常可用。
+- `LumenSurfacePresets.card(radiusDp = 16f, material = FROSTED)`（`@JvmStatic @JvmOverloads`，未发布）：卡片角色的采样表面，等价于 `LumenSurfaceOptions(material = material, role = SurfaceRole.CARD, radiusDp = radiusDp)`，与 `floating()` / `fadingBand()` / `staticPanel()` 同为可 `copy()` 的起点。
 - `LumenSurfaceOptions.withTint(opacity)`（未发布）：`copy(tintOpacity = opacity, fallbackTintOpacity = opacity)` 的简写，结果逐字段相等。
 - bind(view, surface, source: View?) / bindSource(view, surface, source: LumenContentSource?)：可逆背景绑定。
 - `ensure(view, surface = LumenSurfaceOptions(), source: View? = null)` / `ensureSource(view, surface, source: LumenContentSource?, enhancements = DEFAULT)`（`@JvmOverloads`，未发布）：幂等绑定。已绑定、来源相同（分组规则同 bindSource）且背景仍归引擎时就地 update 并返回同一绑定；否则重新绑定。每个绑定条目只有一个 `LumenSurfaceBinding` 实例。
