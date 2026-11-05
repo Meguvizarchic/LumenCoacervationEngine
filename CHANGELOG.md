@@ -6,6 +6,14 @@
 
 ### 性能
 
+- 局部会话的 GPU 透镜程序（LIQUID、FROSTED、Prism 三段 AGSL）在进程内各只编译一次：此前每个绑定、每次重新绑定都重新编译（前台主线程单次约 1.1–1.5 ms，一页 8 个表面约 9 ms，集中在首帧）。每次建效果前写回本表面的强度与光学参数，RuntimeEffect 的 uniform 写时复制保证各效果保留自己的快照。`LensProgramSharingTest`（8 个表面、两种材质各两档强度，Xiaomi 2210132C API 33，基线与改动交替各 2×3 轮）：8 个表面的窗口像素哈希逐个相同；本会话着色器构建 8 → 1；绑定后首帧绘制 7.1–9.6 ms → 3.0–5.6 ms。JVM 契约 `SharedLensProgramContractTest`。
+
+### 测试
+
+- `LifecycleLeakDiagnosticTest`：9 个演示页各开关 8 次（共 72 个实例），GC 后全部可回收，内存压力中心的登记数不随开关次数增长（只有 3 个进程级缓存）。
+
+### 性能
+
 - 软件透镜采样批次的主线程分配：`collectJobs` 复用两张临时列表、批次拆分改用复用的数组成本（`LensBatchSplit.secondHalf(groups, LongArray, processors)`，结果与列表版本相同）、逐表面准备去掉 `Result` 包装。`SamplerBatchAllocationBenchmarkTest`（4 个软件后端表面、内容逐帧变化，Xiaomi 2210132C API 33，基线与改动交替各 2 轮）：每次采样请求主线程分配 2,754–2,756 B → 2,658–2,662 B（含测试夹具与 View 遍历本身的分配），像素回归不变。
 
 ### 新增
