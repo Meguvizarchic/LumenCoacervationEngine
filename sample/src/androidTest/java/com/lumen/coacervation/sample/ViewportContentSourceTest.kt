@@ -64,6 +64,30 @@ class ViewportContentSourceTest {
         assertArrayEquals(first, second)
     }
 
+    /** 便捷构造与 regions 写法逐项等价：裁剪边界、坐标代理尺寸、版本签名与录制像素都相同。 */
+    @Test fun surfaceListConstructorMatchesTheRegionsForm() {
+        ActivityScenario.launch(SurfaceSandboxActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val stage = install(activity)
+                stage.owner.rotation = 2f
+                val regions = LumenViewportContentSource(stage.owner) { use -> use(stage.surface, 0f, 0f, 4f) }
+                val short = LumenViewportContentSource(stage.owner, stage.surface, paddingPx = 4f)
+                try {
+                    for (scroll in intArrayOf(0, 30)) {
+                        stage.owner.scrollTo(0, scroll)
+                        assertEquals(regions.sync(), short.sync())
+                        val a = regions.coordinateView; val b = short.coordinateView
+                        assertEquals(listOf(a.left, a.top, a.width, a.height), listOf(b.left, b.top, b.width, b.height))
+                        assertEquals(regions.availability, short.availability)
+                        assertEquals(regions.contentVersion, short.contentVersion)
+                        assertSamePixels(bitmap(a.width, a.height, regions::drawContent), bitmap(b.width, b.height, short::drawContent))
+                    }
+                } finally { short.close(); regions.close() }
+                assertThrows(IllegalArgumentException::class.java) { LumenViewportContentSource(stage.owner) }
+            }
+        }
+    }
+
     @Test fun overlayVisibilityFollowsOwnerAndCloseCannotReviveIt() {
         ActivityScenario.launch(SurfaceSandboxActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->

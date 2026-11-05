@@ -4,6 +4,8 @@
 
 `LumenViewportContentSource(source, regions)` 把已有内容源裁为所有取样区域的并集；
 `LumenViewportContentSource(contentView, regions)` 则沿用引擎普通 View 源的自身滚动语义。
+表面固定、无内缩时可直接写 `LumenViewportContentSource(owner, glass, paddingPx = 8f)`（未发布），
+与 `LumenViewportContentSource(owner) { use -> use(glass, 0f, 0f, 8f) }` 等价。
 `regions` 同步提供 `(surface, insetX, insetY, padding)`，单位均是 surface 本地像素。
 调用方应在 session 的 pre-draw 前调用 `sync()`，以便同帧更新移动区域及模糊余量。
 
@@ -42,6 +44,9 @@ contentVersion 在每次会话 pre-draw 被读取并遍历可见子树（未发�
 裁剪判断与 Skia 的差别至多在末位舍入，只影响恰好压在视口边缘的 View 是否计入签名。
 设备基准 `ViewportVersionBenchmarkTest`（241 个 View，Xiaomi 2210132C API 33，前后各 3 轮）：单次读取 p50
 212–223µs → 109–130µs；该数字只描述这台设备与该夹具。
+此后（未发布）子 View 的全局矩阵直接由父 View 刚算出的全局矩阵乘以自身 step 求得，公式与运算次序同祖先
+备忘，结果逐位一致，省去逐 View 的 IdentityHashMap 查找、写入与数组拷贝；同一设备与夹具前后各 5 轮：
+p50 111–133µs → 71–88µs，p90 125–149µs → 76–95µs。
 
 JVM 回归覆盖区域并集、边界裁剪、向外取整、连续移动及上述矩阵等式；源码契约保护 overlay
 可见性、软件探针、依赖和关闭出口。sample Android 回归覆盖 owner 可见性与恢复、带自身滚动

@@ -496,6 +496,7 @@ Rive原生时钟能力边界、PAGFile最终释放方式、供应商解析内存
 |---|---|
 | `LumenViewportContentSource(source: LumenContentSource, regions: (consumer: (View, Float, Float, Float) -> Unit) -> Unit)` | `LumenVersionedContentSource` 的包装器；regions 同步枚举 `surface, insetX, insetY, padding`，单位为该 surface 本地 px；在原来源坐标中求相交区域并集并向外取整，source 的 coordinateView 在包装期间必须稳定 |
 | `LumenViewportContentSource(content: View, regions)` | 同上；使用引擎既有 View 内容源，保留 View 自身滚动的录制语义 |
+| `LumenViewportContentSource(source: LumenContentSource, vararg surfaces: View, paddingPx: Float = 0f)`、`LumenViewportContentSource(content: View, vararg surfaces: View, paddingPx: Float = 0f)`（`@JvmOverloads`，未发布） | 固定表面集合、无内缩、统一模糊余量的简写，与 `regions = { use -> surfaces.forEach { use(it, 0f, 0f, paddingPx) } }` 逐项等价；至少一个表面，`paddingPx` 须有限且非负，否则抛 `IllegalArgumentException`。表面集合会变化或需要内缩时用 regions 构造 |
 | `LumenViewportContentSource.sync(): Boolean` | 在会话 pre-draw 前显式更新移动区域、模糊余量与代理尺寸；返回裁剪边界是否变化。无有效区域时退回完整来源；provider 异常时暂不可用，之后可再次同步恢复；关闭后返回 false |
 | `LumenViewportContentSource` 来源成员及 `close()` | 暴露稳定 coordinateView、原来源 dependencies、sourceEpoch、contentVersion、availability 与 excludesSurfaces；不通过坐标代理的 dirty 驱动捕获。ViewGroup 使用透明 overlay 坐标代理，普通 View 保留原锚点并裁剪 Canvas；源中全部注入表面须列入 regions，未声明排除表面的源不得包含其表面。close 移除代理，不关闭原来源；关闭后不重新附着或绘制 |
 | `LumenDrawableScene.create(hardware: Boolean, scale: Float = 1f): LumenDrawableScene` | companion 工厂并提供 Java 静态重载；API 29+ 的硬件请求创建 RenderNode 录制场，旧系统回退 Picture。scale 及其倒数须有限，scale 在 `(0, 1]`；只影响硬件材质，软件保持完整分辨率 |

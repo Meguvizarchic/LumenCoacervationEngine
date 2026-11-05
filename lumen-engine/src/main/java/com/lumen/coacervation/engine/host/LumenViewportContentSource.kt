@@ -34,6 +34,29 @@ public class LumenViewportContentSource(
     public constructor(content: View, regions: (consumer: (View, Float, Float, Float) -> Unit) -> Unit) :
         this(ViewContentSource(content), regions)
 
+    /**
+     * 最常见的写法：固定的一组表面、无内缩、统一的模糊余量（各表面本地 px）。等价于
+     * `LumenViewportContentSource(source) { use -> surfaces.forEach { use(it, 0f, 0f, paddingPx) } }`。
+     * 至少传一个表面；表面集合会变化时改用 regions 构造。
+     */
+    @JvmOverloads
+    public constructor(source: LumenContentSource, vararg surfaces: View, paddingPx: Float = 0f) :
+        this(source, fixedRegions(surfaces, paddingPx))
+
+    /** 同上，使用引擎的普通 View 内容源（保留 View 自身滚动的录制语义）。 */
+    @JvmOverloads
+    public constructor(content: View, vararg surfaces: View, paddingPx: Float = 0f) :
+        this(ViewContentSource(content), fixedRegions(surfaces, paddingPx))
+
+    private companion object {
+        fun fixedRegions(surfaces: Array<out View>, paddingPx: Float): (consumer: (View, Float, Float, Float) -> Unit) -> Unit {
+            require(surfaces.isNotEmpty()) { "at least one surface is required" }
+            require(paddingPx.isFinite() && paddingPx >= 0f) { "paddingPx must be finite and non-negative" }
+            val fixed = surfaces.copyOf()
+            return { use -> for (surface in fixed) use(surface, 0f, 0f, paddingPx) }
+        }
+    }
+
     private val content = source.coordinateView
     private val versioned = source as? LumenVersionedContentSource
     private val mapping = ViewSamplingMatrix()
@@ -41,7 +64,8 @@ public class LumenViewportContentSource(
     private val proxyMatrix = Matrix()
     private val matrix = Matrix()
     private val matrixValues = FloatArray(9)
-    private val viewGlobal = FloatArray(9)
+    private val depthGlobals = ArrayList<FloatArray>()
+    private val stepScratch = FloatArray(9)
     private val targetGlobal = FloatArray(9)
     private val targetInverse = FloatArray(9)
     private val boundsValues = FloatArray(4)
@@ -59,7 +83,7 @@ public class LumenViewportContentSource(
             if (versioned == null || !source.excludesSurfaces) {
                 // 目标（坐标视图）的全局矩阵与逆矩阵每次快照只求一次；逐 View 只剩自己那一步的乘法。
                 if (mapping.localToScreen(coordinateView, targetGlobal) &&
-                    SamplingMatrixMath.invert(targetGlobal, targetInverse)) visitVersion(content, 0)
+                    SamplingMatrixMath.invert(targetGlobal, targetInverse)) visitVersion(content, 0, null)
             }
             versionSignature and Long.MAX_VALUE
         }
@@ -117,11 +141,27 @@ public class LumenViewportContentSource(
      * 每次会话 pre-draw 都会走完整棵可见子树。逐 View 的矩阵留在 FloatArray 上：不再逐个重求目标逆矩阵，
      * 也不经 `Matrix.setValues` / `mapRect` / `getValues` 三次 JNI（均为 @FastNative，各带 9 次逐元素拷贝）。
      * 混入签名的 9 个值与原先 `getValues` 读回的逐位相同（同一次 inverse·global 乘法，scale=1 不改位）。
+     *
+     * 深度优先遍历时父 View 的全局矩阵刚算完：子 View 直接用 父全局 · step(子) 求得，与祖先备忘
+     * （[ViewSamplingMatrix.withAncestorMemo]）的自上而下公式和运算次序完全相同，结果逐位一致，
+     * 但每个 View 省掉备忘表的几次 IdentityHashMap 查找/写入、数组池存取与 9 元素拷贝。根仍经备忘求得。
      */
-    private fun visitVersion(view: View, depth: Int) {
-        if (depth >= 128 || view.visibility != View.VISIBLE || view.alpha <= 0f ||
-            !mapping.localToScreen(view, viewGlobal) || !SamplingMatrixMath.isFinite(viewGlobal)) return
-        SamplingMatrixMath.multiply(targetInverse, viewGlobal, matrixValues)
+    private fun visitVersion(view: View, depth: Int, parentGlobal: FloatArray?) {
+        if (depth >= 128 || view.visibility != View.VISIBLE || view.alpha <= 0f) return
+        val global = depthGlobal(depth)
+        if (parentGlobal == null) {
+            if (!mapping.localToScreen(view, global)) return
+        } else {
+            if (!view.isAttachedToWindow) return
+            mapping.viewStep(view, stepScratch)
+            if (!SamplingMatrixMath.isFinite(stepScratch)) return
+            val parent = view.parent as View
+            SamplingMatrixMath.translateAfter(stepScratch,
+                (view.left.toLong() - parent.scrollX).toFloat(), (view.top.toLong() - parent.scrollY).toFloat())
+            SamplingMatrixMath.multiply(parentGlobal, stepScratch, global)
+        }
+        if (!SamplingMatrixMath.isFinite(global)) return
+        SamplingMatrixMath.multiply(targetInverse, global, matrixValues)
         if (!SamplingMatrixMath.isFinite(matrixValues)) return
         if (SamplingMatrixMath.mapBounds(matrixValues, view.width.toFloat(), view.height.toFloat(), boundsValues)) {
             region.set(boundsValues[0], boundsValues[1], boundsValues[2], boundsValues[3])
@@ -139,7 +179,13 @@ public class LumenViewportContentSource(
         // A hardware ViewGroup can remain clean while only its retained descendant is dirty.
         mixVersion(if (view.isDirty) view.drawingTime.coerceAtLeast(0L) else -1L)
         for (value in matrixValues) mixVersion(value.toBits().toLong())
-        if (view is ViewGroup) for (index in 0 until view.childCount) visitVersion(view.getChildAt(index), depth + 1)
+        if (view is ViewGroup) for (index in 0 until view.childCount) visitVersion(view.getChildAt(index), depth + 1, global)
+    }
+
+    /** 每层一块复用的全局矩阵缓冲（深度至多 128），只在首次到达该深度时分配。 */
+    private fun depthGlobal(depth: Int): FloatArray {
+        while (depthGlobals.size <= depth) depthGlobals += FloatArray(9)
+        return depthGlobals[depth]
     }
 
     private val consumeRegion: (View, Float, Float, Float) -> Unit = consume@ { view, insetX, insetY, padding ->

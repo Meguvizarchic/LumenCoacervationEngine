@@ -47,6 +47,7 @@ REQUIRED = {
     PREFIX + "InputOutlineScrollTest": {
         "longSingleLineInputKeepsItsOutlineAtBothSignedScrollOffsets",
         "longMultilineInputKeepsItsOutlineWhileTheCursorScrollsVertically",
+        "standalonePublicOutlineKeepsItsPlaceAtSignedScrollOffsets",
     },
     PREFIX + "ExpandedAccordionGestureTest": {
         "expandedRowsKeepFourDirectionsWithoutRevealingHiddenSiblings",
@@ -88,6 +89,7 @@ REQUIRED = {
         "continuousSurfaceMovementUpdatesTheCropAndStaticGeometryConverges",
         "hiddenDescendantSurfaceIsStillRejectedAndProviderFailureRecovers",
         "nonContainerSourceRetainsItsAnchorAndClipsInSourceCoordinates",
+        "surfaceListConstructorMatchesTheRegionsForm",
     },
     PREFIX + "SurfaceLegibilityViewportTest": {
         "controllerMapsTheProbeIntoAnOffsetScaledOwnerAndKeepsPendingEntriesAligned",

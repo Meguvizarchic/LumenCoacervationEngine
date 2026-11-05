@@ -152,8 +152,16 @@ class ViewSamplingMatrixTest {
     @Test fun viewportVersionTraversalStaysOnFloatArrays() {
         val source = SourceContract.read("host/LumenViewportContentSource.kt")
         val visit = source.after("private fun visitVersion(").before("private val consumeRegion")
-        assertTrue(visit.contains("SamplingMatrixMath.multiply(targetInverse, viewGlobal, matrixValues)"))
+        assertTrue(visit.contains("SamplingMatrixMath.multiply(targetInverse, global, matrixValues)"))
         assertTrue(visit.contains("SamplingMatrixMath.mapBounds("))
+        // 子 View 直接用父全局矩阵：与祖先备忘同一个 step 公式（视图矩阵 + left/top − 父滚动）与乘法次序。
+        assertTrue(visit.contains("mapping.viewStep(view, stepScratch)"))
+        assertTrue(visit.contains("(view.left.toLong() - parent.scrollX).toFloat(), (view.top.toLong() - parent.scrollY).toFloat())"))
+        assertTrue(visit.contains("SamplingMatrixMath.multiply(parentGlobal, stepScratch, global)"))
+        assertTrue(visit.contains("visitVersion(view.getChildAt(index), depth + 1, global)"))
+        val memo = SourceContract.read("geometry/ViewSamplingMatrix.kt").after("private fun memoizedLocalToScreen(")
+            .before("internal fun viewStep(")
+        assertTrue(memo.contains("SamplingMatrixMath.multiply(parentGlobal, step, global)"))
         assertFalse(visit.contains("sourceToTarget("))
         assertFalse(visit.contains("getValues("))
         val snapshot = source.after("private val snapshotVersion").before("private var unsafe")

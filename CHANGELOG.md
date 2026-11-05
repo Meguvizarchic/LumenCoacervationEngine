@@ -6,6 +6,14 @@
 
 ### 新增
 
+- `LumenViewportContentSource(owner, surface, paddingPx = 8f)`：固定表面集合、无内缩时的简写构造（另有 `LumenContentSource` 版本），与 regions 写法逐项等价；空表面或非法余量立即抛 `IllegalArgumentException`。设备用例 `ViewportContentSourceTest.surfaceListConstructorMatchesTheRegionsForm` 核对裁剪边界、代理尺寸、版本签名与录制像素相同。该用例与 1.6.1 之后新增的 `InputOutlineScrollTest.standalonePublicOutlineKeepsItsPlaceAtSignedScrollOffsets` 一并登记为 smoke 必测项（`verify-smoke-results.py`）。
+
+### 性能
+
+- `LumenViewportContentSource.contentVersion` 遍历时，子 View 的全局矩阵直接由父 View 刚算出的全局矩阵乘以自身 step 求得（与祖先备忘同一公式和运算次序，逐位一致），省去逐 View 的 IdentityHashMap 查找/写入与数组拷贝。`ViewportVersionBenchmarkTest`（241 个 View，Xiaomi 2210132C API 33，前后各 5 轮）：p50 111–133µs → 71–88µs。
+
+### 新增
+
 - `LumenControlOutline.create(context, accentColor, radiusDp, emphasized = false)` 与 `LumenViewportForeground.wrap(drawable)`：不经 `LumenActivityDelegate` 的控件描边与视口前景包装。宿主自有基类与配色此前只能复制 `controlOutline` 与内部的 `ViewportForegroundDrawable`（BIL PR #41 即为此复制了一份）；`LumenActivityDelegate.controlOutline` 现委托给同一实现，像素不变。设备用例 `InputOutlineScrollTest.standalonePublicOutlineKeepsItsPlaceAtSignedScrollOffsets`，JVM 契约 `ControlOutlineContractTest`。
 
 ### 性能
