@@ -57,4 +57,19 @@ class LensBatchSplitTest {
         assertFalse(sampler.contains("availableProcessors"))
         assertEquals(Runtime.getRuntime().availableProcessors(), LensBatchSplit.deviceProcessors)
     }
+
+    /** 数组版本与列表版本对同一输入给出同一结果；数组可以比作业数长（调用方复用）。 */
+    @Test fun arrayCostsMatchTheListVersion() {
+        val a = Any(); val b = Any(); val c = Any()
+        val cases = listOf(
+            listOf<Any>(a, b) to listOf(10L, 20L),
+            listOf<Any>(a, a, b, c) to listOf(5L, 7L, 30L, 2L),
+            listOf<Any>(a, b, c, b, a) to listOf(1L, 9L, 4L, 4L, 8L),
+            listOf<Any>(a, a) to listOf(3L, 3L))
+        for ((groups, costs) in cases) for (processors in intArrayOf(2, 4, 8)) {
+            val padded = LongArray(costs.size + 3) { if (it < costs.size) costs[it] else 999L }
+            org.junit.Assert.assertEquals(LensBatchSplit.secondHalf(groups, costs, processors),
+                LensBatchSplit.secondHalf(groups, padded, processors))
+        }
+    }
 }

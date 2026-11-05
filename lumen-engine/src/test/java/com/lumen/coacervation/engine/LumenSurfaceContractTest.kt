@@ -63,7 +63,7 @@ class LumenSurfaceContractTest {
         val collect=s.after("private fun collectJobs(").before("private fun schedulePendingSample(")
         val throttle=collect.indexOf("entry.cadence.remainingMs(")
         assertTrue(throttle >= 0 && collect.indexOf("prepare(view, entry,") > throttle)
-        assertTrue(collect.contains("plans.forEach { entry -> entry.cadence.sampled(now) }"))
+        assertTrue(collect.contains("if (result != null) for (index in plans.indices) plans[index].cadence.sampled(now)"))
         val trailing=s.after("private val trailingSample = Runnable").before("private var inFlight")
         assertFalse(trailing.contains("dirty = true"))
         val done=s.after("private fun onBatchDone(").before("private fun isInside(")

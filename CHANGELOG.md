@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 性能
+
+- 软件透镜采样批次的主线程分配：`collectJobs` 复用两张临时列表、批次拆分改用复用的数组成本（`LensBatchSplit.secondHalf(groups, LongArray, processors)`，结果与列表版本相同）、逐表面准备去掉 `Result` 包装。`SamplerBatchAllocationBenchmarkTest`（4 个软件后端表面、内容逐帧变化，Xiaomi 2210132C API 33，基线与改动交替各 2 轮）：每次采样请求主线程分配 2,754–2,756 B → 2,658–2,662 B（含测试夹具与 View 遍历本身的分配），像素回归不变。
+
 ### 新增
 
 - `LumenSurfacePresets.card(radiusDp, material)`：卡片角色采样表面的起点，与手写选项逐字段相等（`SurfaceCardPresetTest`）；Sample 材质浓度沙盒的四块玻璃改用它，`MaterialOpacityRegressionTest` 的逐像素断言照常通过。

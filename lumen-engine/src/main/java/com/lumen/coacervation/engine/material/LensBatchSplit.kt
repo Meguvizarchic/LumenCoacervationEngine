@@ -22,6 +22,12 @@ internal object LensBatchSplit {
      */
     fun secondHalf(groups: List<Any>, costs: List<Long>, processors: Int): List<Int>? {
         require(groups.size == costs.size)
+        return secondHalf(groups, LongArray(costs.size) { costs[it] }, processors)
+    }
+
+    /** 同上，成本取自 [costs] 的前 `groups.size` 项（调用方可复用数组，不装箱）。结果与列表版本相同。 */
+    fun secondHalf(groups: List<Any>, costs: LongArray, processors: Int): List<Int>? {
+        require(costs.size >= groups.size)
         if (processors < MIN_PROCESSORS) return null
         val keys = ArrayList<Any>()
         val members = ArrayList<MutableList<Int>>()

@@ -276,6 +276,11 @@ internal class LiveBackdropSampler(
 
     private var source: View? = null
     private val entries = TargetEntries()
+    /** 每批采集在主线程上的临时列表：只在一次 [collectJobs] / [onPreDraw] 调用内使用，批与批之间复用。 */
+    private val planScratch = ArrayList<Entry>()
+    private val planViewScratch = ArrayList<LumenSurfaceTarget>()
+    private val splitGroups = ArrayList<Any>()
+    private var splitCosts = LongArray(8)
     private val viewTargets = WeakHashMap<View, ViewSurfaceTarget>()
     private val roots = WeakHashMap<View, ViewTreeObserver.OnPreDrawListener>()
     /** 内容层的全局矩阵，每批只取一次，所有表面共用。 */
@@ -513,8 +518,15 @@ internal class LiveBackdropSampler(
         inFlight = true
         val token = batchToken
         val measure = counters?.timingEnabled == true
-        val second = LensBatchSplit.secondHalf(jobs.map { it.picture }, jobs.map { it.sampleWidth.toLong() * it.sampleHeight },
-            LensBatchSplit.deviceProcessors)
+        splitGroups.clear()
+        if (splitCosts.size < jobs.size) splitCosts = LongArray(jobs.size)
+        for (index in jobs.indices) {
+            val job = jobs[index]
+            splitGroups += job.picture
+            splitCosts[index] = job.sampleWidth.toLong() * job.sampleHeight
+        }
+        val second = LensBatchSplit.secondHalf(splitGroups, splitCosts, LensBatchSplit.deviceProcessors)
+        splitGroups.clear()
         if (second == null) {
             worker.execute {
                 val ok = runCatching { jobs.forEach { process(it, measure) } }.isSuccess
@@ -548,8 +560,8 @@ internal class LiveBackdropSampler(
     private fun collectJobs(content: View, now: Long): List<LensJob>? {
         // 5 个表面共用同一个内容层：它到屏幕的矩阵每批只算一次（每次都是十几层的 JNI 链）。
         val contentGlobalValid = samplingMatrices.localToScreen(content, contentGlobal)
-        val plans = ArrayList<Entry>(entries.size)
-        val planViews = ArrayList<LumenSurfaceTarget>(entries.size)
+        val plans = planScratch.apply { clear() }
+        val planViews = planViewScratch.apply { clear() }
         entries.beginTraversal()
         try {
             val iterator = entries.entries.iterator()
@@ -559,9 +571,8 @@ internal class LiveBackdropSampler(
                 if (view == null || !view.isAttachedToWindow) { entry.release(); iterator.remove(); continue }
                 if (!view.isShown || view.coordinateView.rootView !== content.rootView) { entry.valid = false; entry.cadence.discardPending(); continue }
                 if (entry.cadence.remainingMs(now, entry.profile?.minIntervalMs ?: ModernMaterialPolicy.LIVE_SAMPLE_MIN_INTERVAL_MS) > 0L) continue
-                val prepared = runCatching { prepare(view, entry, contentGlobalValid) }
-                if (prepared.isFailure) return null
-                if (prepared.getOrDefault(false)) {
+                val prepared = try { prepare(view, entry, contentGlobalValid) } catch (_: Throwable) { return null }
+                if (prepared) {
                     plans += entry
                     planViews += view
                 } else entry.cadence.discardPending()
@@ -571,9 +582,10 @@ internal class LiveBackdropSampler(
         val started=if(counters?.timingEnabled==true)System.nanoTime()else 0L
         val result=runCatching { capture(content, plans, planViews) }.getOrNull()
         if(started!=0L)counters?.recordingTimed(System.nanoTime()-started)
-        return result?.also {
-            plans.forEach { entry -> entry.cadence.sampled(now) }
-        }
+        if (result != null) for (index in plans.indices) plans[index].cadence.sampled(now)
+        // 不跨批持有表面或 View：作业已各自带走所需的引用。
+        plans.clear(); planViews.clear()
+        return result
     }
 
     private fun schedulePendingSample(now: Long) {
