@@ -179,6 +179,7 @@ jobs:
             logcat.txt
             host-usage.txt
             lumen-surface-benchmark.json
+            lumen-leak.hprof
           retention-days: 14
 
   publish:

@@ -61,4 +61,8 @@ if [ "$status" -ne 0 ]; then
   echo "::endgroup::"
 fi
 timeout 15s adb pull /sdcard/Android/data/com.lumen.coacervation.sample/files/lumen-surface-benchmark.json lumen-surface-benchmark.json || true
+# LifecycleLeakDiagnosticTest 超时仍有页面存活时导出的堆，用于离线分析引用链；只在失败时存在。
+if [ "$status" -ne 0 ]; then
+  timeout 120s adb pull /sdcard/Android/data/com.lumen.coacervation.sample/files/lumen-leak.hprof lumen-leak.hprof || true
+fi
 exit "$status"
