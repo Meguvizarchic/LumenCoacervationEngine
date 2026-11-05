@@ -78,6 +78,12 @@ public data class LumenSurfaceOptions(
         require(edgeWidthDp.isFinite() && edgeWidthDp in 0f..8f)
         require(edgeIntensity.isFinite() && edgeIntensity in 0f..3f)
     }
+
+    /**
+     * 实时与回退着色取同一个不透明度（未发布）：等价于 `copy(tintOpacity = opacity, fallbackTintOpacity = opacity)`，
+     * 返回的选项与之逐字段相等，渲染完全相同。
+     */
+    public fun withTint(opacity: Float): LumenSurfaceOptions = copy(tintOpacity = opacity, fallbackTintOpacity = opacity)
 }
 
 /** Hard resource bounds are not optional. Raising a slider cannot disable these limits. */

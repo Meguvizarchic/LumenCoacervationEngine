@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### 新增
+
+- `LumenSurfaceSession.forActivity(activity, palette, options)`：一行创建随 Activity 销毁自动关闭的局部会话，配色默认取当前深浅色的 `LumenPalette.neutral`。关闭发生在 `super.onDestroy()` 内，宿主在 onDestroy 里先关依赖控件的顺序不变；弱持有 Activity，关闭时注销回调。原构造与行为不变。Sample 的 Fluent / 材质浓度 / Prism 沙盒改用它并删去手动 close。
+- `LumenSurfaceOptions.withTint(opacity)`：同时设置 `tintOpacity` 与 `fallbackTintOpacity`（宿主常把两者写成同一个值）。
+- 设备用例 `SurfaceShortcutsTest`（登记为 smoke 必测）：`forActivity`（默认配色）+ `withTint` 与显式构造 + 两参数 copy 的窗口像素逐位相同；Activity 销毁后会话关闭、背景还原、回调注销。
+
 ### 性能
 
 - 实时透镜的行列映射表按表面缓存（`LensRemapTables`）：几何与强度不变时（静止、匀速滚动的同一表面）不再每个作业分配三张列表、也不再逐行逐列求 `lens()`；输出与改写前逐位相同（`BitExactKernelsTest` 600 组几何序列覆盖命中、扩容、缩小与改强度）。底栏典型尺寸 2000 次重映射：分配 4,161,536 B → 0；API 34 模拟器 p50 77–84µs → 59–63µs，p90 229–262µs → 97–133µs（`LensRemapTablesBenchmarkInstrumentedTest`）。

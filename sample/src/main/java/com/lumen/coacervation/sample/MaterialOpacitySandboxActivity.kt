@@ -104,7 +104,7 @@ class MaterialOpacitySandboxActivity : Activity() {
             insets
         }
 
-        session = LumenSurfaceSession(this, palette)
+        session = LumenSurfaceSession.forActivity(this, palette)
         frosted = session.bind(frostedTile, LumenSurfaceOptions(material = LumenSurfaceMaterial.FROSTED, role = SurfaceRole.CARD,
             radiusDp = 20f), scene)
         liquid = session.bind(liquidTile, LumenSurfaceOptions(material = LumenSurfaceMaterial.LIQUID, role = SurfaceRole.CARD,
@@ -243,10 +243,9 @@ class MaterialOpacitySandboxActivity : Activity() {
     override fun onDestroy() {
         destroyed = true
         scope.close()
-        // Close the glass before the session it samples from.
+        // Close the glass before the session it samples from (forActivity closes it inside super.onDestroy()).
         fluent.close(); prism.close(); frosted.close(); liquid.close(); direct.close(); software.close(); mica.close()
         slider.dispose()
-        session.close()
         super.onDestroy()
     }
 }

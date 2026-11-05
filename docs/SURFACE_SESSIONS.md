@@ -6,7 +6,9 @@ LumenSurfaceSession 用于已有应用里的顶底栏、局部浮层和独立 Di
 完整 Activity 继续使用 LumenActivityDelegate；调用方保留自己的 Activity 基类、授权门和业务回调。
 
 ```kotlin
-val session = LumenSurfaceSession(context, palette)
+// Activity 内推荐（未发布）：配色默认跟随当前深浅色，Activity 销毁时自动关闭
+val session = LumenSurfaceSession.forActivity(this)
+// 其他 Context 或需要自己控制关闭时仍用构造：LumenSurfaceSession(context, palette)
 val binding = session.bind(bar, LumenSurfacePresets.floating(), content)
 session.setListener { id, backend, failure, firstVisible -> /* 绘制栈之外，主线程 */ }
 binding.update(LumenSurfaceOptions(opacity = 0.8f))

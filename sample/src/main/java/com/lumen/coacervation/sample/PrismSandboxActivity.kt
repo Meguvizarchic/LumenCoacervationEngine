@@ -93,7 +93,7 @@ class PrismSandboxActivity : Activity() {
             insets
         }
 
-        session = LumenSurfaceSession(this, palette())
+        session = LumenSurfaceSession.forActivity(this, palette())
         card = LumenPrismGlass(cardView, palette(), glassOptions, session, scene)
         button = LumenPrismGlass(buttonView, palette(), glassOptions.copy(cornerRadiusDp = null), session, scene)
         // The bar keeps its own touch and selection; the prism glass only replaces its background.
@@ -282,10 +282,9 @@ class PrismSandboxActivity : Activity() {
     override fun onStop() { session.pause(); super.onStop() }
     override fun onDestroy() {
         pageAnimator?.cancel()
-        // Close the glass before the session it samples from.
+        // Close the glass before the session it samples from (forActivity closes it inside super.onDestroy()).
         card.close(); button.close(); bar.close()
         navigation.dispose()
-        session.close()
         super.onDestroy()
     }
 

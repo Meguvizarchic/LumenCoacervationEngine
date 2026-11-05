@@ -2,7 +2,10 @@ package com.lumen.coacervation.engine.host
 
 import android.content.ComponentCallbacks2
 import android.content.Context
+import android.app.Activity
+import android.app.Application
 import android.content.res.Configuration
+import android.os.Bundle
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorFilter
@@ -692,6 +695,48 @@ public class LumenSurfaceSession @JvmOverloads constructor(
         closed = true; listener = null
         recordingScrolls.clear()
         unregisterTrim(); LumenMemoryPressureHub.removeListener(memoryListener)
+        activityCloser?.let { (appContext as? Application)?.unregisterActivityLifecycleCallbacks(it) }
+        activityCloser = null
+    }
+
+    /** [forActivity] 登记的随 Activity 销毁关闭回调；只弱持有 Activity，关闭时注销。 */
+    private var activityCloser: Application.ActivityLifecycleCallbacks? = null
+
+    private fun closeWith(activity: Activity) {
+        val application = appContext as? Application ?: return
+        val owner = WeakReference(activity)
+        val closer = object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityDestroyed(destroyed: Activity) { if (destroyed === owner.get()) close() }
+            override fun onActivityCreated(created: Activity, state: Bundle?) = Unit
+            override fun onActivityStarted(started: Activity) = Unit
+            override fun onActivityResumed(resumed: Activity) = Unit
+            override fun onActivityPaused(paused: Activity) = Unit
+            override fun onActivityStopped(stopped: Activity) = Unit
+            override fun onActivitySaveInstanceState(saved: Activity, state: Bundle) = Unit
+        }
+        activityCloser = closer
+        application.registerActivityLifecycleCallbacks(closer)
+    }
+
+    public companion object {
+        /**
+         * 一行创建随 [activity] 生命周期管理的局部会话（未发布）：配色默认取 Activity 当前深浅色下的
+         * [LumenPalette.neutral]，Activity 销毁时引擎自动 [close]，宿主不必在 onDestroy 里关闭会话。
+         *
+         * 自动关闭发生在 `super.onDestroy()` 内部（Application 分发 onActivityDestroyed 时），晚于宿主自己
+         * onDestroy 里的代码：宿主先关闭依赖本会话的控件（Fluent、Prism、Mica 等），会话随后关闭，与手写顺序相同。
+         * 手动 [close] 照常可用且幂等。行为与 `LumenSurfaceSession(activity, palette, options)` 完全一致，只多了自动关闭。
+         */
+        @JvmStatic
+        @JvmOverloads
+        public fun forActivity(
+            activity: Activity,
+            palette: LumenPalette = LumenPalette.neutral(
+                activity.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES),
+            options: LumenSurfaceSessionOptions = LumenSurfaceSessionOptions()
+        ): LumenSurfaceSession = LumenSurfaceSession(activity, palette, options).also { session ->
+            if (activity.isDestroyed) session.close() else session.closeWith(activity)
+        }
     }
 
     private inner class Group(val source: LumenContentSource) : ViewTreeObserver.OnPreDrawListener,

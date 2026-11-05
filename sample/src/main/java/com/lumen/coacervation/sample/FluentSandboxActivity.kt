@@ -76,7 +76,7 @@ class FluentSandboxActivity : Activity() {
             insets
         }
 
-        session = LumenSurfaceSession(this, palette())
+        session = LumenSurfaceSession.forActivity(this, palette())
         flyout = LumenFluentControl(panel, palette(), flyoutOptions, session, scene)
         controls.forEach { buttons += LumenFluentControl(it, palette(), buttonOptions) }
         scene.setOnScrollChangeListener { v, _, _, _, _ -> session.notifyScrollPositionChanged(v) }
@@ -127,10 +127,9 @@ class FluentSandboxActivity : Activity() {
     override fun onStart() { super.onStart(); session.resume() }
     override fun onStop() { session.pause(); super.onStop() }
     override fun onDestroy() {
-        // Close the controls before the session they sample from.
+        // Close the controls before the session they sample from (forActivity closes it inside super.onDestroy()).
         buttons.forEach { it.close() }
         flyout.close()
-        session.close()
         super.onDestroy()
     }
 }

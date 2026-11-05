@@ -166,6 +166,7 @@ REQUIRED = {
     },
     PREFIX + "SurfaceBenchmarkTest": {"compareFixedSceneWithLegacyAndEnhancedPlansAndPreserveRawSamples"},
     PREFIX + "SurfaceEnsureTest": {"ensureReusesUpdatesAndRebindsExactlyWhenTheHostReconcileWould"},
+    PREFIX + "SurfaceShortcutsTest": {"shortcutsRenderExactlyLikeTheExplicitCalls", "forActivitySessionClosesWithTheActivity"},
     PREFIX + "PanelClipContainmentTest": {
         "restingPanelMasksOverflowAndTracksContentRelayout",
         "heldDragPreservesViewportAndRestoresOnlyInnerClipReliefs",

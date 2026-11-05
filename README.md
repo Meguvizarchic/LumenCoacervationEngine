@@ -196,12 +196,11 @@ class MainActivity : AppCompatActivity() {
 已有页面只给顶栏、浮层或卡片加材质时，用局部会话；每次刷新主题或状态时对每个表面调用 `ensure`，不必自己记录绑定与背景归属（未发布）：
 
 ```kotlin
-val session = LumenSurfaceSession(context, palette)
+val session = LumenSurfaceSession.forActivity(this)   // 随 Activity 销毁自动关闭
 fun refresh() {
-    session.ensure(topBar, LumenSurfacePresets.fadingBand(), source = content)
-    input.foreground = LumenControlOutline.create(context, palette.primary, radiusDp = 14f)
+    session.ensure(topBar, LumenSurfacePresets.fadingBand().withTint(.42f), source = content)
+    input.foreground = LumenControlOutline.create(this, palette.primary, radiusDp = 14f)
 }
-// onDestroy: session.close()
 ```
 
 材质选择用 `LumenEngine.selectMaterial()`；长按与弹窗分别接入 `LumenElasticInteraction`、`LumenModalPresenter`。滚动、全屏页、局部会话及可选模块的完整写法见[适配标准](docs/INTEGRATION_STANDARD.md)和 [`sample/`](sample)。
