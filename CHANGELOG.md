@@ -6,6 +6,14 @@
 
 ### 新增
 
+- `LumenSurfaceSession.ensure(view, surface, source)` / `ensureSource(view, surface, source, enhancements)`：幂等绑定。宿主刷新主题或状态时每个表面调用一次：已绑定、来源相同且背景仍归引擎时就地 `update`（选项相同即空操作）并交回同一绑定，否则重新绑定并包裹宿主的新背景。取代宿主手写的“isBound + 背景归属 + padding 保存 + update/重绑”对账（BIL 六处同形）。设备用例 `SurfaceEnsureTest`（登记为 smoke 必测），JVM 契约 `SurfaceEnsureContractTest`。
+
+### 性能
+
+- 每个绑定条目缓存唯一的 `LumenSurfaceBinding` 句柄，`bind`/`bindSource`/`bindTarget`/draw-only 绑定与 `ensure` 不再每次分配；`update` 与 `ensure` 共用同一条就地更新路径。8 个表面的对账（Xiaomi 2210132C API 33，5 轮）：宿主手写 p50 7.4–10.7µs / p90 8.8–12.6µs，`ensure` p50 7.1–9.3µs / p90 7.3–9.5µs，且宿主侧不再需要两张 HashMap 与重绑时的 padding 数组。
+
+### 新增
+
 - `LumenViewportContentSource(owner, surface, paddingPx = 8f)`：固定表面集合、无内缩时的简写构造（另有 `LumenContentSource` 版本），与 regions 写法逐项等价；空表面或非法余量立即抛 `IllegalArgumentException`。设备用例 `ViewportContentSourceTest.surfaceListConstructorMatchesTheRegionsForm` 核对裁剪边界、代理尺寸、版本签名与录制像素相同。该用例与 1.6.1 之后新增的 `InputOutlineScrollTest.standalonePublicOutlineKeepsItsPlaceAtSignedScrollOffsets` 一并登记为 smoke 必测项（`verify-smoke-results.py`）。
 
 ### 性能

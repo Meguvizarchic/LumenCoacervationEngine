@@ -18,6 +18,30 @@ binding.close()
 session.close()
 ```
 
+## 每次刷新都调用 ensure（推荐，未发布）
+
+宿主随主题、滚动状态或页面阶段反复刷新表面时，用 `ensure` / `ensureSource` 代替自己维护绑定表：
+
+```kotlin
+// 旧写法：宿主自己记绑定与背景归属，并在重绑时保存 padding
+val binding = bindings[view]
+if (binding?.isBound != true || owned[view] !== view.background) {
+    binding?.close()
+    val padding = intArrayOf(view.paddingLeft, view.paddingTop, view.paddingRight, view.paddingBottom)
+    bindings[view] = session.bindSource(view, options, source)
+    view.background?.let { owned[view] = it }
+    view.setPadding(padding[0], padding[1], padding[2], padding[3])
+} else if (changed) binding.update(options)
+
+// 新写法
+session.ensureSource(view, options, source)   // View 来源用 session.ensure(view, options, sourceView)
+```
+
+- 已绑定、来源相同、背景仍是引擎装上的那块：就地 `update`（选项相同即空操作，不重建、不失效），返回**同一个**绑定对象。
+- 从未绑定、绑定已关闭、来源变化，或宿主换掉了背景：重新绑定，包裹宿主的新背景；关闭时还原的也是这块新背景。
+- padding 一直由引擎保留，宿主不需要保存与恢复；会话关闭后返回未绑定的空句柄。
+- 同一绑定条目始终交回同一个 `LumenSurfaceBinding` 实例（`bind`/`bindSource`/`bindTarget` 同样如此）。
+
 ## 可选原生 backdrop
 
 绑定默认保持显式来源采样。对基础 FROSTED 圆角 View 背景，可调用 `binding.setRenderTargetBackdropEnabled(true)` 请求 API 37.2 的原生 backdrop；它处理当前渲染目标中在本节点之前已绘制的像素，宿主需确认其内容及顺序符合场景。`source` 继续用于来源安全校验与回退，不能用它选择原生路径的输入。完整示例及范围见 [NATIVE_BACKDROP.md](NATIVE_BACKDROP.md)。

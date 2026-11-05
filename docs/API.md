@@ -324,6 +324,7 @@ view.foreground = LumenViewportForeground.wrap(myFocusRing)
 
 - LumenSurfaceSession(context, palette, options)：不接管根/窗口/输入、不读写偏好的AutoCloseable会话。
 - bind(view, surface, source: View?) / bindSource(view, surface, source: LumenContentSource?)：可逆背景绑定。
+- `ensure(view, surface = LumenSurfaceOptions(), source: View? = null)` / `ensureSource(view, surface, source: LumenContentSource?, enhancements = DEFAULT)`（`@JvmOverloads`，未发布）：幂等绑定。已绑定、来源相同（分组规则同 bindSource）且背景仍归引擎时就地 update 并返回同一绑定；否则重新绑定。每个绑定条目只有一个 `LumenSurfaceBinding` 实例。
 - setListener / updatePalette / updateOptions / notifyContentChanged / notifyPositionChanged / `notifyScrollPositionChanged(scrollHost: View)`。
 - pause / resume / releaseGraphics / diagnostics / close；关闭后入口无副作用。
 - LumenSurfaceBinding：id / update / diagnostics / close；旧绑定不能关闭新绑定。

@@ -137,7 +137,45 @@ public class LumenSurfaceSession @JvmOverloads constructor(
         registerTrim()
         view.addOnAttachStateChangeListener(entry)
         entry.install()
-        return LumenSurfaceBinding(this, entry.id)
+        return entry.binding
+    }
+
+    /**
+     * 幂等绑定：[view] 已由本会话绑定、来源相同、且背景仍是引擎装上的那块时，只按需 [LumenSurfaceBinding.update]
+     * （选项相同即为空操作，不重建、不失效）并返回同一个绑定；否则（从未绑定、绑定已关闭、宿主换掉了背景或来源变了）
+     * 重新 [bind]。宿主每次刷新主题或状态时对每个表面调用一次即可，不再需要自己维护绑定表、背景归属与 padding。
+     */
+    @JvmOverloads
+    public fun ensure(view: View, surface: LumenSurfaceOptions = LumenSurfaceOptions(), source: View? = null): LumenSurfaceBinding =
+        reuse(view, surface, null, source, LumenSurfaceEnhancements.DEFAULT)
+            ?: bindSource(view, surface, source?.let(::ViewContentSource), LumenSurfaceEnhancements.DEFAULT)
+
+    /** [ensure] 的自定义来源版本，语义同 [bindSource]。 */
+    @JvmOverloads
+    public fun ensureSource(view: View, surface: LumenSurfaceOptions, source: LumenContentSource?,
+        enhancements: LumenSurfaceEnhancements = LumenSurfaceEnhancements.DEFAULT): LumenSurfaceBinding =
+        reuse(view, surface, source, null, enhancements) ?: bindSource(view, surface, source, enhancements)
+
+    /** 可沿用时就地更新并返回原绑定；返回 null 表示需要重新绑定。来源判定与 [bindSource] 的分组规则一致。 */
+    private fun reuse(view: View, surface: LumenSurfaceOptions, source: LumenContentSource?, sourceView: View?,
+        enhancements: LumenSurfaceEnhancements): LumenSurfaceBinding? {
+        if (closed) return null
+        checkMain()
+        val entry = entries.firstOrNull { it.installsBackground && it.host.get() === view } ?: return null
+        val group = entry.group
+        val sameSource = when {
+            group == null -> source == null && sourceView == null
+            sourceView != null -> group.source is ViewContentSource && group.source.coordinateView === sourceView
+            source != null -> group.source === source || group.source.coordinateView === source.coordinateView &&
+                group.source is ViewContentSource && source is ViewContentSource
+            else -> false
+        }
+        // 关闭状态下背景本来就是宿主原有的那块；开启时必须仍是引擎装上的，否则宿主已接管背景，需要重新包裹。
+        val installed = entry.config.enabled && options.enabled
+        if (!sameSource || installed && view.background !== entry.drawable) return null
+        updateEntry(entry, surface)
+        updateEntryEnhancements(entry, enhancements)
+        return entry.binding
     }
 
     /** A draw target has its own identity and geometry; its coordinate View is only a Window anchor. */
@@ -161,7 +199,7 @@ public class LumenSurfaceSession @JvmOverloads constructor(
         entry.rebuild()
         registerTrim()
         target.coordinateView.addOnAttachStateChangeListener(entry)
-        return LumenSurfaceBinding(this, entry.id)
+        return entry.binding
     }
 
     /**
@@ -191,7 +229,7 @@ public class LumenSurfaceSession @JvmOverloads constructor(
         entry.rebuild()
         registerTrim()
         view.addOnAttachStateChangeListener(entry)
-        return LumenSurfaceBinding(this, entry.id)
+        return entry.binding
     }
 
     /**
@@ -437,11 +475,13 @@ public class LumenSurfaceSession @JvmOverloads constructor(
     internal fun updateEnhancements(id: Long,value: LumenSurfaceEnhancements) {
         if(closed)return
         checkMain()
-        entries.firstOrNull {it.id==id}?.let {
-            if(it.enhancements==value)return
-            it.enhancements=value;it.graphics.enabled=value.debug.countersEnabled;it.graphics.timingEnabled=value.debug.timingEnabled
-            it.group?.refreshCounterOptions();it.rebuild()
-        }
+        entries.firstOrNull {it.id==id}?.let { updateEntryEnhancements(it, value) }
+    }
+
+    private fun updateEntryEnhancements(it: Entry, value: LumenSurfaceEnhancements) {
+        if(it.enhancements==value)return
+        it.enhancements=value;it.graphics.enabled=value.debug.countersEnabled;it.graphics.timingEnabled=value.debug.timingEnabled
+        it.group?.refreshCounterOptions();it.rebuild()
     }
 
     internal fun updatePress(id: Long,x: Float,y: Float,pressure: Float) {
@@ -576,25 +616,27 @@ public class LumenSurfaceSession @JvmOverloads constructor(
     internal fun update(id: Long, value: LumenSurfaceOptions) {
         if (closed) return
         checkMain()
-        entries.firstOrNull { it.id == id }?.let { entry ->
-            if (entry.config == value) return
-            val next = LumenMaterialRecipe.resolve(value, entry.enhancements.material, palette)
-            val tintOnly = entry.appearance.copy(tintOpacity = next.tintOpacity,
-                fallbackTintOpacity = next.fallbackTintOpacity) == next
-            entry.config = value
-            if (tintOnly) {
-                // Legibility changes only the tint; retain the sampled frame and its backend.
-                entry.appearance = next
-                entry.drawable.configure()
-                if (entry.installsBackground && entry.host.get()?.background !== entry.drawable) entry.install()
-                else entry.invalidateFrame()
-            } else {
-                entry.rebuild()
-                entry.install()
-            }
-            // The material or role may have changed; a binding at full opacity has nothing to re-resolve.
-            if (entry.materialOpacity < 1f) entry.resolveMaterialOpacity()
+        entries.firstOrNull { it.id == id }?.let { updateEntry(it, value) }
+    }
+
+    private fun updateEntry(entry: Entry, value: LumenSurfaceOptions) {
+        if (entry.config == value) return
+        val next = LumenMaterialRecipe.resolve(value, entry.enhancements.material, palette)
+        val tintOnly = entry.appearance.copy(tintOpacity = next.tintOpacity,
+            fallbackTintOpacity = next.fallbackTintOpacity) == next
+        entry.config = value
+        if (tintOnly) {
+            // Legibility changes only the tint; retain the sampled frame and its backend.
+            entry.appearance = next
+            entry.drawable.configure()
+            if (entry.installsBackground && entry.host.get()?.background !== entry.drawable) entry.install()
+            else entry.invalidateFrame()
+        } else {
+            entry.rebuild()
+            entry.install()
         }
+        // The material or role may have changed; a binding at full opacity has nothing to re-resolve.
+        if (entry.materialOpacity < 1f) entry.resolveMaterialOpacity()
     }
 
     internal fun detach(id: Long) {
@@ -896,6 +938,8 @@ public class LumenSurfaceSession @JvmOverloads constructor(
         val target: LumenSurfaceTarget = ViewSurfaceTarget(view, matrices), val installsBackground: Boolean = true
     ) : View.OnAttachStateChangeListener {
         val host = WeakReference(view)
+        /** 同一条目始终交回同一个句柄：重复 ensure 不再分配。 */
+        val binding = LumenSurfaceBinding(this@LumenSurfaceSession, id)
         var original = if (installsBackground) view.background else null
         private val sourceGlobal = FloatArray(9)
         private val targetGlobal = FloatArray(9)

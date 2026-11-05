@@ -165,6 +165,7 @@ REQUIRED = {
         "fusedSelectorKeepsBusinessSelectionAndRestoresOnlyOwnedResources",
     },
     PREFIX + "SurfaceBenchmarkTest": {"compareFixedSceneWithLegacyAndEnhancedPlansAndPreserveRawSamples"},
+    PREFIX + "SurfaceEnsureTest": {"ensureReusesUpdatesAndRebindsExactlyWhenTheHostReconcileWould"},
     PREFIX + "PanelClipContainmentTest": {
         "restingPanelMasksOverflowAndTracksContentRelayout",
         "heldDragPreservesViewportAndRestoresOnlyInnerClipReliefs",
