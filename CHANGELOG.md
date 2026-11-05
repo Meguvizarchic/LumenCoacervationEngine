@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### 变更
+
+- 进程级内存压力自动接管：引擎第一次拿到 Context（`LumenActivityDelegate.prepare()`、`LumenSurfaceSession`、`LumenMicaBackdrop`）时在 Application 上登记一次系统回调，`TRIM_MEMORY_RUNNING_CRITICAL`、`>= TRIM_MEMORY_COMPLETE` 与 onLowMemory 自动调用 `LumenEngine.releaseGraphics()`。宿主不再需要在 `Application.onTrimMemory` 里转发（INTEGRATION_STANDARD §3.3 放宽，已有转发仍有效）；控件阴影纹理、宿主 `LumenPreparedBackdropCache`、Mica 图像与进程级已准备底图此前只在宿主转发时才随系统 trim 释放。Sample 删除了手动转发。
+
+### 性能
+
+- 高级材质实时档的自定义背景不再生成光学副本：实时档折射与根绘制读清晰底图，副本从不绘制，此前仍在后台做一次 CPU 软化、分配同尺寸位图并上传纹理。每张自定义背景少一张位图（至多 2 MiB 堆 + 等量 GPU），进程级已准备底图缓存（4 MiB）可多容纳一条。设备用例 `LiquidCustomBackdropMemoryInstrumentedTest` 核对折射输入与底图逐位相同。
+
 ### 新增
 
 - `LumenSurfaceSession.ensure(view, surface, source)` / `ensureSource(view, surface, source, enhancements)`：幂等绑定。宿主刷新主题或状态时每个表面调用一次：已绑定、来源相同且背景仍归引擎时就地 `update`（选项相同即空操作）并交回同一绑定，否则重新绑定并包裹宿主的新背景。取代宿主手写的“isBound + 背景归属 + padding 保存 + update/重绑”对账（BIL 六处同形）。设备用例 `SurfaceEnsureTest`（登记为 smoke 必测），JVM 契约 `SurfaceEnsureContractTest`。

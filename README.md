@@ -128,8 +128,7 @@ Compose 原型只覆盖上述局部能力，尚不提供完整 Activity、原生
 ```mermaid
 flowchart TD
   A[添加依赖: includeBuild 复合构建或 maven 坐标] --> B[Activity 挂 LumenActivityDelegate]
-  B --> C[Application 转发 onTrimMemory 给 LumenEngine]
-  C --> D{需要交互与动效?}
+  B --> D{需要交互与动效?}
   D -->|否| E[最小接入完成]
   D -->|是| F[再挂 LumenElasticInteraction / LumenModalPresenter]
   F --> E
@@ -188,18 +187,9 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
-**3. 处理进程级内存压力**
+**3. 进程级内存压力（自动）**
 
-在宿主的 Application 中转发：
-
-```kotlin
-override fun onTrimMemory(level: Int) {
-    super.onTrimMemory(level)
-    if (level == TRIM_MEMORY_RUNNING_CRITICAL || level >= TRIM_MEMORY_COMPLETE) {
-        LumenEngine.releaseGraphics()
-    }
-}
-```
+引擎在第一次创建会话时自动登记进程级 trim 回调，只在 `TRIM_MEMORY_RUNNING_CRITICAL`（15）或 `>= TRIM_MEMORY_COMPLETE`（80）时释放图形资源（未发布；此前需要宿主在 `Application.onTrimMemory` 里转发 `LumenEngine.releaseGraphics()`，已有转发仍然有效）。宿主自己的内存协调器可随时调用 `LumenEngine.releaseGraphics()`。
 
 **4. 不接管整个 Activity 的局部表面（可选）**
 

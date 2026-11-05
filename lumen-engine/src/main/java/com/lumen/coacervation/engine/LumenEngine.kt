@@ -115,7 +115,8 @@ public object LumenEngine {
      * 内存压力：释放全部会话的图形资源（实时取样缓冲、预缩放底图、内容节点显示列表）并把高级材质降到
      * 零额外资源的 TRANSLUCENT 后端；稳定底图保留（它就是用户可见的背景）。
      *
-     * 宿主在进程级内存告急时调用，典型位置是 `Application.onTrimMemory` 收到 `TRIM_MEMORY_RUNNING_CRITICAL`（15）
+     * 引擎第一次创建会话时已在 Application 上自动登记系统 trim 回调（15 与 >= 80 时调用本方法），宿主不必转发；
+     * 宿主自己的内存协调器另行判断告急时可以直接调用，门槛同样是 `TRIM_MEMORY_RUNNING_CRITICAL`（15）
      * 或 `TRIM_MEMORY_COMPLETE`（80）。**不要**按"数值越大越严重"判断：20（`UI_HIDDEN`）只是普通切后台，
      * 在那里释放会让用户每次切后台都永久丢掉高级材质。Activity 级的 onTrimMemory/onLowMemory 已由
      * [com.lumen.coacervation.engine.host.LumenActivityDelegate] 转发，不需要重复调用。

@@ -86,6 +86,11 @@ class LiquidRefractionSourceWiringTest {
         assertTrue(custom.contains("LiquidBackdropSizingPolicy.resolve(fullWidth, fullHeight)"))
         assertTrue(custom.contains("createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)"))
         assertTrue(custom.contains("LiquidOpticalSamplingPolicy.soften("))
+        // 实时档的光学副本从不绘制：在软化与分配之前就以清晰底图本身返回。
+        val crisp = custom.after("if (crispRefraction) return LiquidBackdropSource(").before("val pixels")
+        assertTrue(crisp.contains("crispRefraction = true)"))
+        assertFalse(crisp.contains("opticalBitmap ="))
+        assertTrue(custom.indexOf("if (crispRefraction) return") < custom.indexOf("LiquidOpticalSamplingPolicy.soften("))
         assertFalse(custom.contains("resolvePresentation"))
         val renderer = source("LiquidActivityRenderer")
         assertFalse(renderer.contains("resolvePresentation"))

@@ -32,7 +32,7 @@
 | `fun selectMaterial(context, material, realtimeCapture: Boolean? = null): Boolean` | 切换材质；true 时宿主 `recreate()` | §3.2 |
 | `fun isRealtimeCaptureEnabled(context): Boolean` | 全屏实时取样开关 | §3.2 |
 | `fun setRealtimeCaptureEnabled(context, enabled): Boolean` | 写入开关；需重建 Activity 生效 | §3.2 |
-| `fun releaseGraphics()` | 进程级内存告急（trim 15 / ≥80）时释放图形资源 | §3.3 |
+| `fun releaseGraphics()` | 进程级内存告急（trim 15 / ≥80）时释放图形资源。未发布：引擎首次创建会话时已在 Application 上自动登记同门槛的系统回调，宿主无需转发，仍可由自己的内存协调器调用 | §3.3 |
 
 ### `LumenEngineConfig`（data class）
 

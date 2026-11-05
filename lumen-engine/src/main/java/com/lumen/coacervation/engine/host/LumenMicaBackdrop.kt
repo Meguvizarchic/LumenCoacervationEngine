@@ -80,6 +80,7 @@ public class LumenMicaBackdrop @JvmOverloads constructor(
         drawable.configure(options, palette, image)
         replaceBackground(view, drawable)
         view.addOnAttachStateChangeListener(attach)
+        LumenMemoryPressureHub.installSystemCallbacks(view.context)
         LumenMemoryPressureHub.addListener(memory)
         if (view.isAttachedToWindow) observe(view)
         refreshPolicy()

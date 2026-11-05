@@ -102,6 +102,7 @@ public class LumenSurfaceSession @JvmOverloads constructor(
 
     init {
         checkMain()
+        LumenMemoryPressureHub.installSystemCallbacks(appContext)
         LumenMemoryPressureHub.addListener(memoryListener)
     }
 

@@ -174,6 +174,7 @@
 
 ### 3.3 内存压力
 
+- （未发布）引擎第一次拿到 Context（`LumenActivityDelegate.prepare()`、`LumenSurfaceSession`、`LumenMicaBackdrop` 创建）时，会在 Application 上自动登记进程级回调，按下面同一门槛调用 `releaseGraphics()`。宿主**不再需要**在 `Application.onTrimMemory` 里转发；已有的转发保持有效，重复释放是空操作。以下条款适用于宿主自己的内存协调器另行调用 `releaseGraphics()` 的情形。
 - `Application.onTrimMemory(level)` 里，**只**在以下两种情况调用 `LumenEngine.releaseGraphics()`：
   - `level == TRIM_MEMORY_RUNNING_CRITICAL`（15）；
   - `level >= TRIM_MEMORY_COMPLETE`（80）。
@@ -446,7 +447,7 @@ root（bindRoot）
 - [ ] §2.1 的六个回调全部转发，时机正确。
 - [ ] 授权门、早退分支之后才调用 `prepare()`；`prepare()` 在构建视图之前。
 - [ ] `bindRoot()` 在 `setContentView` 之后；`onFailure` 里提示并 `recreate()`。
-- [ ] `Application.onTrimMemory` 只在 15 或 ≥ 80 时调用 `releaseGraphics()`。
+- [ ] 若宿主自行调用 `releaseGraphics()`（引擎已自动处理系统 trim），只在 15 或 ≥ 80 时调用。
 - [ ] 材质开关：`selectMaterial` 返回 true 时 `recreate()`，返回 false 时恢复开关并提示。
 - [ ] 每一个属性动画位移，都逐帧调用 `notifyPositionChanged()`；翻页器在平移和可见性都应用之后才通知。
 - [ ] 滚动容器在实际 scrollX/Y 改变后调用 `notifyScrollPositionChanged(scrollHost)`，拖动、惯性、程序滚动和停下的最后一帧均覆盖；页面销毁时解除回调。

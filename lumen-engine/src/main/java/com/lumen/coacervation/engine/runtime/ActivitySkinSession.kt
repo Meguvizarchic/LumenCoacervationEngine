@@ -306,6 +306,7 @@ internal class ActivitySkinSession private constructor(
             materialPalette: LumenPalette,
             effectTuning: LumenEffectTuning = LumenEffectTuning.DEFAULT
         ): ActivitySkinSession {
+            LumenMemoryPressureHub.installSystemCallbacks(activity)
             val requestedSkin = SkinRepository.resolveRequestedSkin(activity)
             val configuration = activity.resources.configuration
             val owner = if (requestedSkin == SkinId.LIQUID) {

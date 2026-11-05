@@ -340,6 +340,10 @@ internal class LiquidBackdropSource private constructor(
             require(bitmap.width == expected.width && bitmap.height == expected.height) {
                 "Custom backdrop bitmap does not match the bounded sample size"
             }
+            // 实时档折射读清晰底图（refractionBitmap = bitmap），光学副本从不参与绘制：不再为它做一次
+            // CPU 软化、分配同尺寸位图并上传纹理（每张自定义背景至多 2 MiB 堆 + 等量 GPU）。
+            if (crispRefraction) return LiquidBackdropSource(bitmap = bitmap, customAssetId = assetId,
+                isRealtime = false, fullWidth = fullWidth, fullHeight = fullHeight, crispRefraction = true)
             val pixels = IntArray(bitmap.width * bitmap.height)
             bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
             val softened = LiquidOpticalSamplingPolicy.soften(pixels, bitmap.width, bitmap.height,
