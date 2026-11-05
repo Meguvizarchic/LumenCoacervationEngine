@@ -82,6 +82,37 @@ class BitExactKernelsTest {
     }
 
     /**
+     * 按表面缓存的映射表：同一份表跨越几何变化（命中、扩容、缩小、只改强度）后，输出仍与改写前的实现逐位相同；
+     * 几何与强度不变时不重建。
+     */
+    @Test fun cachedRemapTablesMatchThePreRewriteImplementationAndRebuildOnlyOnChange() {
+        val random = Random(7)
+        val tables = com.lumen.coacervation.engine.material.LensRemapTables()
+        var expectedBuilds = 0
+        var previous: List<Any>? = null
+        repeat(600) { iteration ->
+            val repeatPrevious = previous != null && iteration % 3 != 0
+            val dw = if (repeatPrevious) previous!![0] as Int else 1 + random.nextInt(300)
+            val dh = if (repeatPrevious) previous!![1] as Int else 1 + random.nextInt(120)
+            val margin = if (repeatPrevious) previous!![2] as Int else random.nextInt(16)
+            val strength = if (repeatPrevious) previous!![3] as Float else if (iteration % 7 == 0) 0f else random.nextFloat() * 1.5f
+            val key = listOf<Any>(dw, dh, margin, strength)
+            if (key != previous) expectedBuilds++
+            previous = key
+            val sw = dw + 2 * margin
+            val sh = dh + 2 * margin
+            val source = image(random, sw, sh, iteration % 5)
+            val expected = IntArray(dw * dh)
+            val actual = IntArray(dw * dh)
+            ReferenceLensRemap.remap(source, sw, sh, margin, expected, dw, dh, strength)
+            LensRefractionPolicy.remap(source, sw, sh, margin, actual, dw, dh, strength, tables)
+            assertArrayEquals("iteration=$iteration", expected, actual)
+        }
+        org.junit.Assert.assertEquals(expectedBuilds, tables.builds)
+        org.junit.Assert.assertTrue("most batches must hit the cache", tables.builds < 300)
+    }
+
+    /**
      * 四邻同色捷径的前提：任意小数坐标下，同一通道值 v 经四权重插值、加 0.5 截断后仍是 v。
      * 覆盖边界小数（0、最小正数、0.5 两侧、最接近 1 的值）与大量随机小数，每组穷举全部 256 个 v。
      */

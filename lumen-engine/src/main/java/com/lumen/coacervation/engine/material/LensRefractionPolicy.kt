@@ -74,35 +74,27 @@ internal object LensRefractionPolicy {
      * 把含外沿的模糊采样 [source]（sw × sh，外沿 [margin] 像素）按透镜重采样到 [out]（dw × dh）。
      * dest 满幅对应 source 的内区 [margin, sw − margin] × [margin, sh − margin]。双线性、CLAMP。
      */
-    fun remap(source: IntArray, sw: Int, sh: Int, margin: Int, out: IntArray, dw: Int, dh: Int, strength: Float = 1f) {
+    fun remap(source: IntArray, sw: Int, sh: Int, margin: Int, out: IntArray, dw: Int, dh: Int, strength: Float = 1f) =
+        remap(source, sw, sh, margin, out, dw, dh, strength, LensRemapTables())
+
+    /**
+     * 同上，行列映射取自调用方持有的 [tables]：几何与强度不变时（静止、匀速滚动的同一表面）不再分配映射表、
+     * 也不再逐行逐列求 lens()。表中每一项与逐次计算的表达式完全相同，输出逐位不变。
+     * [tables] 不是线程安全的：同一时刻只能有一个调用方使用（采样器按表面持有，单飞保证）。
+     */
+    fun remap(source: IntArray, sw: Int, sh: Int, margin: Int, out: IntArray, dw: Int, dh: Int, strength: Float,
+        tables: LensRemapTables) {
         require(sw > 0 && sh > 0 && source.size >= sw * sh)
         require(dw > 0 && dh > 0 && out.size >= dw * dh)
-        val innerW = (sw - 2 * margin).coerceAtLeast(1).toFloat()
-        val innerH = (sh - 2 * margin).coerceAtLeast(1).toFloat()
-        val maxX = (sw - 1).toFloat()
-        val maxY = (sh - 1).toFloat()
-        // 列映射只依赖 x：原来在内层逐像素重算 dw×dh 次 lens()，现在每列算一次存成表
-        // （dw≈88 时 7744 次 → 88 次）。纯提取，输出逐位不变。
-        val columnLeft = IntArray(dw)
-        val columnRight = IntArray(dw)
-        val columnFrac = FloatArray(dw)
-        for (x in 0 until dw) {
-            val u = (x + 0.5f) / dw * 2f - 1f
-            val sx = ((lens(u, CENTER_GAIN_X * strength, RIM_PUSH_X * strength) + 1f) * 0.5f * innerW + margin - 0.5f).coerceIn(0f, maxX)
-            val x0 = sx.toInt().coerceIn(0, sw - 1)
-            columnLeft[x] = x0
-            columnRight[x] = (x0 + 1).coerceAtMost(sw - 1)
-            columnFrac[x] = sx - x0
-        }
+        tables.prepare(sw, sh, margin, dw, dh, strength)
+        val columnLeft = tables.columnLeft
+        val columnRight = tables.columnRight
+        val columnFrac = tables.columnFrac
         for (y in 0 until dh) {
-            val v = (y + 0.5f) / dh * 2f - 1f
-            val sy = ((lens(v, CENTER_GAIN_Y * strength, RIM_PUSH_Y * strength) + 1f) * 0.5f * innerH + margin - 0.5f).coerceIn(0f, maxY)
-            val y0 = sy.toInt().coerceIn(0, sh - 1)
-            val y1 = (y0 + 1).coerceAtMost(sh - 1)
-            val fy = sy - y0
+            val fy = tables.rowFrac[y]
             val row = y * dw
-            val rowTop = y0 * sw
-            val rowBottom = y1 * sw
+            val rowTop = tables.rowTop[y] * sw
+            val rowBottom = tables.rowBottom[y] * sw
             for (x in 0 until dw) {
                 val x0 = columnLeft[x]
                 val x1 = columnRight[x]
@@ -118,6 +110,30 @@ internal object LensRefractionPolicy {
                 }
                 out[row + x] = bilinear(c00, c10, c01, c11, columnFrac[x], fy)
             }
+        }
+    }
+
+    /** 列映射只依赖 x、行映射只依赖 y：各算一次存成表（dw≈88 时 7744 次 lens() → 88 + dh 次）。 */
+    internal fun buildTables(tables: LensRemapTables, sw: Int, sh: Int, margin: Int, dw: Int, dh: Int, strength: Float) {
+        val innerW = (sw - 2 * margin).coerceAtLeast(1).toFloat()
+        val innerH = (sh - 2 * margin).coerceAtLeast(1).toFloat()
+        val maxX = (sw - 1).toFloat()
+        val maxY = (sh - 1).toFloat()
+        for (x in 0 until dw) {
+            val u = (x + 0.5f) / dw * 2f - 1f
+            val sx = ((lens(u, CENTER_GAIN_X * strength, RIM_PUSH_X * strength) + 1f) * 0.5f * innerW + margin - 0.5f).coerceIn(0f, maxX)
+            val x0 = sx.toInt().coerceIn(0, sw - 1)
+            tables.columnLeft[x] = x0
+            tables.columnRight[x] = (x0 + 1).coerceAtMost(sw - 1)
+            tables.columnFrac[x] = sx - x0
+        }
+        for (y in 0 until dh) {
+            val v = (y + 0.5f) / dh * 2f - 1f
+            val sy = ((lens(v, CENTER_GAIN_Y * strength, RIM_PUSH_Y * strength) + 1f) * 0.5f * innerH + margin - 0.5f).coerceIn(0f, maxY)
+            val y0 = sy.toInt().coerceIn(0, sh - 1)
+            tables.rowTop[y] = y0
+            tables.rowBottom[y] = (y0 + 1).coerceAtMost(sh - 1)
+            tables.rowFrac[y] = sy - y0
         }
     }
 
@@ -188,5 +204,35 @@ internal object LensRefractionPolicy {
     private fun channelByte(value: Float): Int {
         val rounded = (value + 0.5f).toInt()
         return if (rounded < 0) 0 else if (rounded > 255) 255 else rounded
+    }
+}
+
+/**
+ * [LensRefractionPolicy.remap] 的行列映射缓存。键是全部输入几何与强度（强度按位比较）；任何一项变化就按需扩容并重建。
+ * 采样器每个表面持有一份，只在处理该表面的透镜线程上使用。
+ */
+internal class LensRemapTables {
+    var columnLeft = IntArray(0); private set
+    var columnRight = IntArray(0); private set
+    var columnFrac = FloatArray(0); private set
+    var rowTop = IntArray(0); private set
+    var rowBottom = IntArray(0); private set
+    var rowFrac = FloatArray(0); private set
+    private var key = LongArray(6) { -1L }
+    /** 测试与诊断：重建次数。 */
+    var builds = 0; private set
+
+    /** @return 本次是否重建了映射表 */
+    fun prepare(sw: Int, sh: Int, margin: Int, dw: Int, dh: Int, strength: Float): Boolean {
+        val bits = strength.toRawBits().toLong()
+        if (key[0] == sw.toLong() && key[1] == sh.toLong() && key[2] == margin.toLong() &&
+            key[3] == dw.toLong() && key[4] == dh.toLong() && key[5] == bits) return false
+        if (columnLeft.size < dw) { columnLeft = IntArray(dw); columnRight = IntArray(dw); columnFrac = FloatArray(dw) }
+        if (rowTop.size < dh) { rowTop = IntArray(dh); rowBottom = IntArray(dh); rowFrac = FloatArray(dh) }
+        LensRefractionPolicy.buildTables(this, sw, sh, margin, dw, dh, strength)
+        key[0] = sw.toLong(); key[1] = sh.toLong(); key[2] = margin.toLong()
+        key[3] = dw.toLong(); key[4] = dh.toLong(); key[5] = bits
+        builds++
+        return true
     }
 }

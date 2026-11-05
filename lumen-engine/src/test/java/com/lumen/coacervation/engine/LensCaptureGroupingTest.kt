@@ -58,7 +58,7 @@ class LensCaptureGroupingTest {
         assertTrue("采样器必须用渲染器的矩阵工具，录制里的静态磨砂映射才吃得到备忘",
             !sampler.contains("private val samplingMatrices = ViewSamplingMatrix()"))
         val renderer = source("material/FrostedMaterialRenderer.kt")
-        assertTrue(renderer.contains("LiveBackdropSampler(density, samplingMatrices)"))
+        assertTrue(renderer.contains("LiveBackdropSampler(density, samplingMatrices, byteBudget = ModernMaterialPolicy.LIVE_SAMPLE_BYTES)"))
         val matrices = source("geometry/ViewSamplingMatrix.kt")
         val scope = matrices.after("fun <T> withAncestorMemo(").before("fun localToScreen(")
         assertTrue("作用域结束必须清空备忘，不跨帧保留任何 View",

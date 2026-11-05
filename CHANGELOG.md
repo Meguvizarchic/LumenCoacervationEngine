@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### 性能
+
+- 实时透镜的行列映射表按表面缓存（`LensRemapTables`）：几何与强度不变时（静止、匀速滚动的同一表面）不再每个作业分配三张列表、也不再逐行逐列求 `lens()`；输出与改写前逐位相同（`BitExactKernelsTest` 600 组几何序列覆盖命中、扩容、缩小与改强度）。底栏典型尺寸 2000 次重映射：分配 4,161,536 B → 0；API 34 模拟器 p50 77–84µs → 59–63µs，p90 229–262µs → 97–133µs（`LensRemapTablesBenchmarkInstrumentedTest`）。
+- 柔光渲染器的实时透镜缓冲有了总字节预算 `ModernMaterialPolicy.LIVE_SAMPLE_BYTES`（8 MiB，可容纳 17 个最坏尺寸表面，与局部会话默认值相同）；此前没有总量上限。超出时新表面退回静态磨砂。
+
 ### 变更
 
 - 进程级内存压力自动接管：引擎第一次拿到 Context（`LumenActivityDelegate.prepare()`、`LumenSurfaceSession`、`LumenMicaBackdrop`）时在 Application 上登记一次系统回调，`TRIM_MEMORY_RUNNING_CRITICAL`、`>= TRIM_MEMORY_COMPLETE` 与 onLowMemory 自动调用 `LumenEngine.releaseGraphics()`。宿主不再需要在 `Application.onTrimMemory` 里转发（INTEGRATION_STANDARD §3.3 放宽，已有转发仍有效）；控件阴影纹理、宿主 `LumenPreparedBackdropCache`、Mica 图像与进程级已准备底图此前只在宿主转发时才随系统 trim 释放。Sample 删除了手动转发。

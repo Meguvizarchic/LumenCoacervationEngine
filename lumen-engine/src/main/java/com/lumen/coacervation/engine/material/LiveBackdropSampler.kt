@@ -78,6 +78,8 @@ internal class LiveBackdropSampler(
     private val observeSourceDirty: Boolean = true
 ) {
     private class Entry(val budget: LumenSampleBudget?) {
+        /** 透镜重映射的行列表：只在处理本表面的透镜线程上使用（单飞保证同一时刻至多一个作业）。 */
+        val remapTables = LensRemapTables()
         var profile: LumenSurfaceSampling? = null
         var preserveBackdropColors = false
         var raw: LumenRawSampleProfile? = null
@@ -262,7 +264,8 @@ internal class LiveBackdropSampler(
         val weakRadius: Int,val strongRadius: Int,
         val sourceEpoch: Long,val contentVersion: Long,val started: Long,
         /** Published input replay to re-blur (blur-scale change only); null = replay [picture] as usual. */
-        val reuse: Bitmap? = null
+        val reuse: Bitmap? = null,
+        val remapTables: LensRemapTables = LensRemapTables()
     ) {
         private val target = WeakReference(view)
         val view: LumenSurfaceTarget? get() = target.get()
@@ -791,7 +794,8 @@ internal class LiveBackdropSampler(
             weakRadius=weakRadius,
             strongRadius=strongRadius,
             sourceEpoch=events?.sourceEpoch?:0L,contentVersion=events?.contentVersion?:0L,started=started,
-            reuse = reuse
+            reuse = reuse,
+            remapTables = entry.remapTables
         )
     }
 
@@ -1013,7 +1017,8 @@ internal class LiveBackdropSampler(
             LensRefractionPolicy.remap(
                 blurred, job.sampleWidth, job.sampleHeight, job.margin,
                 job.out, job.outWidth, job.outHeight,
-                if (job.profile?.refractionEnabled == false) 0f else job.profile?.refractionStrength ?: 1f
+                if (job.profile?.refractionEnabled == false) 0f else job.profile?.refractionStrength ?: 1f,
+                job.remapTables
             )
             if (!job.preserveBackdropColors) LensRefractionPolicy.illuminate(job.out)
             LensRefractionPolicy.unpremultiply(job.out)

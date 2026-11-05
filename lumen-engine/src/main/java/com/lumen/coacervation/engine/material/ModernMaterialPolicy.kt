@@ -45,6 +45,13 @@ internal object ModernMaterialPolicy {
      */
     const val LIVE_SAMPLE_MEMO_BYTES = 512L * 1024
 
+    /**
+     * 柔光渲染器实时透镜缓冲的总字节预算（与局部会话默认的 `maxSoftwareBytes` 相同）。单个表面在
+     * [LensRefractionPolicy.MAX_SAMPLE_PIXELS] 内最多约 469 KiB（采样 12 B/像素 + 输出 8 B/像素），
+     * 8 MiB 可容纳 17 个最坏尺寸的表面；此前没有总量上限，只靠单表面的像素上限。超出时新表面退回静态磨砂。
+     */
+    const val LIVE_SAMPLE_BYTES = 8 * 1024 * 1024
+
     fun sampleSize(width: Int, height: Int): Pair<Int, Int> {
         require(width > 0 && height > 0)
         val scale = minOf(SAMPLE_SCALE.toDouble(), sqrt(MAX_BACKDROP_PIXELS.toDouble() / (width.toDouble() * height)))

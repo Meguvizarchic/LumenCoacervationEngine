@@ -129,7 +129,7 @@ internal class FrostedMaterialRenderer(
     private val worker by lazy { Executors.newSingleThreadExecutor { task -> Thread(task, "Lumen-SoftFrost").apply { isDaemon = true } } }
     private val handler = Handler(Looper.getMainLooper())
     // 与透镜采集共用矩阵工具：采集录制里每张卡片的静态磨砂映射都走这里，采集期间的祖先备忘才能生效。
-    private val live = LiveBackdropSampler(density, samplingMatrices)
+    private val live = LiveBackdropSampler(density, samplingMatrices, byteBudget = ModernMaterialPolicy.LIVE_SAMPLE_BYTES)
     private val layoutListener = View.OnLayoutChangeListener { _, l, t, r, b, _, _, _, _ -> requestBackdrop(r - l, b - t) }
 
     /**
