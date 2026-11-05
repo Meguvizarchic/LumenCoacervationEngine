@@ -11,6 +11,7 @@
 ### 性能
 
 - 高级材质实时档的自定义背景不再生成光学副本：实时档折射与根绘制读清晰底图，副本从不绘制，此前仍在后台做一次 CPU 软化、分配同尺寸位图并上传纹理。每张自定义背景少一张位图（至多 2 MiB 堆 + 等量 GPU），进程级已准备底图缓存（4 MiB）可多容纳一条。设备用例 `LiquidCustomBackdropMemoryInstrumentedTest` 核对折射输入与底图逐位相同。
+- 高级材质实时档的 Activity 退到后台时只留正在显示的那一块实时截图，交还另外两块轮转缓冲、探测原图、抑制底图与区域比较池（默认 100 万像素预算下约 16 MB／Activity，返回栈越深收益越大）；回到前台补齐缓冲、保留绑定，玻璃不会在首次截图前闪回稳定底图。交还的缓冲只断引用、不回收（三缓冲轮转约束），不走会永久降级的挂起或 TRANSLUCENT 路径。设备用例 `LiquidPerformanceLifecycleRegressionTest.stoppingKeepsOnlyTheDisplayedCaptureAndReturningRegrowsWithoutRebinding`（热状态 4 的夹具：5,037,120 B → 1,679,040 B → 回前台 5,037,120 B），JVM 契约 `LiquidStopEvictionContractTest`。
 
 ### 新增
 
@@ -35,6 +36,10 @@
 ### 性能
 
 - `LumenViewportContentSource.contentVersion`：每次会话 pre-draw 遍历可见子树时，目标逆矩阵每次快照只求一次，逐 View 不再经 `Matrix.setValues` / `mapRect` / `getValues` 三次 JNI，可见性裁剪改用与 `SkMatrix::mapRect` 同分支的纯 Kotlin 包围盒（`SamplingMatrixMath.mapBounds`，透视矩阵仍交给 Skia）。签名值逐位不变。设备基准 `ViewportVersionBenchmarkTest`（241 个 View、表面覆盖整个来源，400 次读取，同一设备前后 APK 各 3 轮）：Xiaomi 2210132C（API 33）单次读取 p50 212–223µs → 109–130µs，p90 231–278µs → 125–147µs。
+
+### 构建
+
+- `tools/engine_device_tests.py` 与 ucodex `engine-device` 档：lumen-engine 自带仪器化测试按类逐个运行、每类限时，只认 `OK (n tests)` 与唯一的 `INSTRUMENTATION_CODE: -1`。无 Activity 的库测试进程可能被厂商省电机制挂起，整包运行会无限等待。
 
 ## [1.6.1] - 2026-10-30
 

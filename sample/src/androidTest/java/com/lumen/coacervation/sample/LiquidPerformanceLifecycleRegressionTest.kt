@@ -120,4 +120,44 @@ class LiquidPerformanceLifecycleRegressionTest {
             assertEquals("A permanently suspended renderer must not reopen thermal resources", 1, thermal.starts)
         }
     }
+
+    /**
+     * 退到后台只留正在显示的那一块实时截图；回前台补齐另外两块，绑定不变（不闪回稳定底图），
+     * 下一次截图写进新补的缓冲。记录 stop 前后实时缓冲的字节。
+     */
+    @Test fun stoppingKeepsOnlyTheDisplayedCaptureAndReturningRegrowsWithoutRebinding() {
+        val allocated = ArrayList<Bitmap>()
+        withRenderer({ w, h -> Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { allocated += it } }) { activity, renderer, _, _ ->
+            call(renderer, "onActivityStarted")
+            val root = View(activity).apply { layout(0, 0, 1080, 2340) }
+            val allocate = renderer.javaClass.getDeclaredMethod("ensureRealtimeCaptureSources", View::class.java)
+                .apply { isAccessible = true }
+            val sources = requireNotNull(allocate.invoke(renderer, root) as List<*>)
+            assertEquals(3, sources.size)
+            fun bitmapOf(source: Any?) = read(requireNotNull(source), "bitmap") as Bitmap
+            fun liveBytes() = (read(renderer, "realtimeCaptureSources") as List<*>).sumOf { bitmapOf(it).allocationByteCount.toLong() }
+            val before = liveBytes()
+            // 模拟一次已提交的截图：玻璃正在读第二块缓冲。
+            val shown = sources[1]
+            field(renderer, "realtimeBackdropSource").set(renderer, shown)
+            call(renderer, "onActivityStopped")
+            val kept = read(renderer, "realtimeCaptureSources") as List<*>
+            assertEquals(1, kept.size)
+            assertSame(shown, kept[0])
+            assertSame("the displayed capture stays bound while stopped", shown, read(renderer, "realtimeBackdropSource"))
+            assertEquals(false, read(shown!!, "closed"))
+            assertTrue("released buffers are dropped, never recycled", allocated.none { it.isRecycled })
+            val afterStop = liveBytes()
+            call(renderer, "onActivityStarted")
+            val regrown = requireNotNull(allocate.invoke(renderer, root) as List<*>)
+            assertEquals(3, regrown.size)
+            assertSame(shown, regrown[0])
+            assertSame("returning must not rebind the stable backdrop", shown, read(renderer, "realtimeBackdropSource"))
+            assertEquals("the next capture writes a freshly regrown buffer", 1, read(renderer, "realtimeCaptureNextIndex"))
+            assertEquals(5, allocated.size)
+            assertEquals(before, liveBytes())
+            android.util.Log.i("Lumen-Bench", "realtimeBuffers beforeStop=$before afterStop=$afterStop regrown=${liveBytes()}")
+            assertTrue(afterStop * 3 == before)
+        }
+    }
 }

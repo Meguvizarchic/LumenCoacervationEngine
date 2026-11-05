@@ -205,6 +205,39 @@
           "timeout_seconds": 3600
         }
       ]
+    },
+    "engine-device": {
+      "description": "lumen-engine 自带仪器化测试：构建测试 APK，再由 tools/engine_device_tests.py 逐类安装运行（每类 300 秒上限、严格解析 OK 与 INSTRUMENTATION_CODE: -1）。需已连接设备；结果在 build/engine-device/summary.json。",
+      "steps": [
+        {
+          "id": "engine-test-apk",
+          "argv": [
+            "cmd.exe",
+            "/d",
+            "/c",
+            ".\\gradlew.bat",
+            ":lumen-engine:assembleDebugAndroidTest",
+            "-Dorg.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8 -Djava.io.tmpdir=C:\\Windows\\Temp",
+            "--console=plain",
+            "--no-daemon"
+          ],
+          "timeout_seconds": 1800
+        },
+        {
+          "id": "engine-device-tests",
+          "argv": [
+            "python",
+            "tools/engine_device_tests.py",
+            "--apk",
+            "lumen-engine/build/outputs/apk/androidTest/debug/lumen-engine-debug-androidTest.apk",
+            "--output",
+            "build/engine-device",
+            "--timeout",
+            "300"
+          ],
+          "timeout_seconds": 5400
+        }
+      ]
     }
   }
 }

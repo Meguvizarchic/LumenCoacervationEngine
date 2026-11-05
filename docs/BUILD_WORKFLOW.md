@@ -43,6 +43,9 @@ API 33／34 使用现有 Mesa `lavapipe` 模拟器图形路径及 `skiagl` HWUI�
 # 完整 CI 任务图；PowerShell 下含点的 -P 参数整体加引号。
 .\gradlew.bat assembleDebug testDebugUnitTest :sample:testReleaseUnitTest lintDebug bundleReleaseAar sourceReleaseJar :sample:minifyReleaseWithR8 '-Plumen.verifySampleR8=true' --console=plain --no-daemon
 python -m unittest discover -s tools -p 'test_*.py' -v
+# lumen-engine 自带仪器化测试：逐类运行、每类限时、严格解析结果（无 Activity 的测试进程可能被厂商省电挂起）
+python tools/engine_device_tests.py --apk lumen-engine/build/outputs/apk/androidTest/debug/lumen-engine-debug-androidTest.apk --output build/engine-device
+# 连着多台设备时加 --serial <序列号>；部分厂商系统会冻结无窗口的缓存级进程（线程停在 do_freezer_trap），此时改用模拟器
 
 # 先构建 release 与 androidTest APK；实际 API 与设备一致。
 python .github/scripts/smoke_artifacts.py create build/demo-apks --revision (git rev-parse HEAD)

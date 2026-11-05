@@ -761,6 +761,28 @@ internal class LiquidActivityRenderer(
         resetRealtimeIdle()
         performanceController?.stop()
         refreshRate.restore()
+        releaseIdleCaptureBuffers()
+    }
+
+    /**
+     * 退到后台：只留正在显示的那一块实时截图（玻璃此刻正读它），其余两块轮转缓冲、探测原图、抑制底图与区域比较池
+     * 交还（默认 100 万像素预算下约 16 MB）。回到前台由 [ensureRealtimeCaptureSources] 补齐，不重绑稳定底图，
+     * 玻璃不会在首次截图前闪回静态背景。被交还的缓冲只断引用、不回收：RenderThread 或在途 PixelCopy
+     * 可能仍持有它们（ENGINEERING_RULES §5 三缓冲轮转），在途请求已由 [onActivityStopped] 作废。
+     * 尚未绑定过截图时整组释放（玻璃本来就在读稳定底图）。
+     */
+    private fun releaseIdleCaptureBuffers() {
+        val sources = realtimeCaptureSources
+        if (closed || sources.isEmpty()) return
+        val bound = realtimeBackdropSource?.takeIf { current -> !current.isClosed && sources.any { it === current } }
+        if (bound == null) {
+            releaseRealtimeCaptureSources(rebindStableBackdrop = true)
+            return
+        }
+        sources.forEach { if (it !== bound) it.close() }
+        realtimeCaptureSources = listOf(bound)
+        realtimeCaptureNextIndex = 0
+        releaseSuppressionUnderlay()
     }
 
     override fun surface(fallbackColor: Int, radiusDp: Float, role: SurfaceRole): Drawable =
@@ -2220,13 +2242,33 @@ internal class LiquidActivityRenderer(
             pixelBudget = realtimeSamplePixelBudget
         )
         val existing = realtimeCaptureSources
-        if (existing.size == LiquidRealtimeCapturePolicy.BUFFER_COUNT &&
-            existing.all {
-                !it.isClosed && it.fullWidth == width && it.fullHeight == height &&
-                    it.bitmap.width == target.width && it.bitmap.height == target.height
+        val reusable = existing.isNotEmpty() && existing.all {
+            !it.isClosed && it.fullWidth == width && it.fullHeight == height &&
+                it.bitmap.width == target.width && it.bitmap.height == target.height
+        }
+        if (reusable && existing.size == LiquidRealtimeCapturePolicy.BUFFER_COUNT) return existing
+        if (reusable && existing.size < LiquidRealtimeCapturePolicy.BUFFER_COUNT) {
+            // 后台只留下了正在显示的那一块（[releaseIdleCaptureBuffers]）：补齐其余缓冲，保留绑定，
+            // 下一次截图写进新补的缓冲，不会改写玻璃正在读的那一块。
+            val grown = ArrayList<LiquidBackdropSource>(LiquidRealtimeCapturePolicy.BUFFER_COUNT).apply { addAll(existing) }
+            val added = runCatching {
+                while (grown.size < LiquidRealtimeCapturePolicy.BUFFER_COUNT) {
+                    val bitmap = createRealtimeBitmap(target.width, target.height)
+                    bitmap.eraseColor(palette.background)
+                    grown += LiquidBackdropSource.fromRealtimeBitmap(bitmap, width, height)
+                }
             }
-        ) {
-            return existing
+            if (added.isFailure) {
+                for (index in existing.size until grown.size) {
+                    grown[index].close()
+                    if (!grown[index].bitmap.isRecycled) grown[index].bitmap.recycle()
+                }
+                suspendRealtimeCapture(releaseBuffers = false)
+                return null
+            }
+            realtimeCaptureSources = grown
+            realtimeCaptureNextIndex = existing.size
+            return grown
         }
 
         releaseRealtimeCaptureSources(rebindStableBackdrop = true)
