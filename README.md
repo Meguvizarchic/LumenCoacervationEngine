@@ -1,29 +1,44 @@
 <div align="center">
 
-# 凝光视效引擎
+<img src="docs/brand/LumenCoacervationEngine.svg" width="96" height="96" alt="LumenCoacervationEngine">
 
-**Lumen Coacervation Engine**
+# LumenCoacervationEngine
 
-面向 Android View 系统的可移植玻璃材质与视效引擎
+**面向 Android View 系统的可移植玻璃材质与视效引擎**
 
-<br>
-
-**简体中文**
+材质 · 动效 · 独立核心 · 可选家族桥
 
 <br>
 
-[![License](https://img.shields.io/github/license/jichuo1/LumenCoacervationEngine?style=flat-square&color=a32d2a)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-00AEEC?style=flat-square&labelColor=2d3a55)](LICENSE)
+[![Language](https://img.shields.io/badge/lang-Kotlin-DEA584?style=flat-square&labelColor=2d3a55)](https://github.com/Meguvizarchic/LumenCoacervationEngine)
+[![Issues](https://img.shields.io/github/issues/Meguvizarchic/LumenCoacervationEngine?style=flat-square&labelColor=2d3a55)](https://github.com/Meguvizarchic/LumenCoacervationEngine/issues)
 [![Android](https://img.shields.io/badge/Android-8.1%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](#要求)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Release](https://img.shields.io/github/v/release/jichuo1/LumenCoacervationEngine?include_prereleases&style=flat-square&label=release)](https://github.com/jichuo1/LumenCoacervationEngine/releases)
-[![JitPack](https://jitpack.io/v/jichuo1/LumenCoacervationEngine.svg)](https://jitpack.io/#jichuo1/LumenCoacervationEngine)
 [![Issues](https://img.shields.io/github/issues/jichuo1/LumenCoacervationEngine?style=flat-square)](https://github.com/jichuo1/LumenCoacervationEngine/issues)
 
-**[下载 Demo / 查看最新发布](https://github.com/jichuo1/LumenCoacervationEngine/releases/latest)**
-
-[功能](#功能) · [下载 Demo](#下载-demo) · [材质](#两套材质) · [要求](#要求) · [接入](#接入) · [文档](#文档) · [出处与许可](#出处与许可)
+[功能](#功能) · [下载 Demo](#下载-demo) · [两套材质](#两套材质) · [要求](#要求) · [接入](#接入) · [文档](#文档) · [反馈](#反馈) · [出处与许可](#出处与许可)
 
 </div>
+
+---
+
+<details>
+<summary><b>目录</b></summary>
+
+- [功能](#功能)
+- [下载 Demo](#下载-demo)
+- [两套材质](#两套材质)
+- [要求](#要求)
+- [接入](#接入)
+- [文档](#文档)
+- [反馈](#反馈)
+- [出处与许可](#出处与许可)
+
+</details>
+
+---
 
 > [!NOTE]
 > 本项目抽离自 [Bilibili Innocent Lab](https://github.com/jichuo1/Bilibili_Innocent_Lab)，以 Apache-2.0 单独授权发布。
