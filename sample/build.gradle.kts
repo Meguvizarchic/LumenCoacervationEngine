@@ -6,6 +6,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val meguvizBridge = providers.gradleProperty("lumen.meguviz").orNull == "true"
+
 android {
     namespace = "com.lumen.coacervation.sample"
     compileSdk = providers.gradleProperty("lumen.compileSdk").get().toInt()
@@ -63,4 +65,18 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation("com.tencent.tav:libpag:4.5.98-noffavc")
+    if (meguvizBridge) {
+        implementation(project(":lumen-bridge-meguviz-android"))
+        implementation(platform(libs.meguviz.bom))
+        implementation(libs.meguviz.android.lifecycle)
+    }
+}
+
+if (meguvizBridge) {
+    // 可选 Meguviz 演示页：只在 -Plumen.meguviz=true 时编入，默认演示包的代码、清单与体积不变。
+    androidComponents.onVariants { variant ->
+        variant.sources.kotlin?.addStaticSourceDirectory("src/meguviz/java")
+        variant.sources.manifests.addStaticManifestFile("src/meguviz/AndroidManifest.xml")
+        variant.androidTest?.sources?.kotlin?.addStaticSourceDirectory("src/androidTestMeguviz/java")
+    }
 }

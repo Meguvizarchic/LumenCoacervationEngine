@@ -20,6 +20,7 @@
 |---|---|
 | [SURFACE_SESSIONS.md](SURFACE_SESSIONS.md) | 局部视效会话：来源、采样、位置与滚动通知 |
 | [VIEWPORT_CONTENT_SOURCE.md](VIEWPORT_CONTENT_SOURCE.md) | 小视口来源：区域并集、overlay 坐标、前景探针、反馈拒绝与关闭 |
+| [MEGUVIZ_BRIDGE.md](MEGUVIZ_BRIDGE.md) | 可选 Meguviz 桥（未发布）：为什么只有 MeguvizAndroid 一座、最小接入、本地 staging 构建、联调验证与 Meguviz 侧 Lumen 桥的兼容结果 |
 | [VISUAL_EFFECTS.md](VISUAL_EFFECTS.md) | 局部增强：轮廓、按压、光源、渐进模糊、质量与平台回退 |
 | [P2_EFFECTS_AND_ASSETS.md](P2_EFFECTS_AND_ASSETS.md) | 传感器光源、程序化效果与粒子、Lottie / PAG / Rive 资产 |
 | [NATIVE_COMPOSE.md](NATIVE_COMPOSE.md) | 原生 Compose 接入原型与待验收项 |

@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 新增
+
+- 可选桥 `lumen-bridge-meguviz-android`（未发布，默认不进构建，`docs/MEGUVIZ_BRIDGE.md`）：`WindowSession.openLumenSurfaces()` 在 MeguvizAndroid 窗口会话上开 Lumen 局部会话，随窗口会话关闭，不另登记 Activity 回调；版本由 `platform(meguviz-bom)` 对齐。Meguviz 1.2.0 上 Maven Central 之前只在 `-Plumen.meguviz=true` 的本地构建里存在，CI、JitPack 与不用 Meguviz 的宿主不受影响。Sample 同时多一个演示页 `MeguvizBridgeActivity` 与设备测试 `MeguvizBridgeTest`（桥接与两套各自管理的窗口像素逐个相同）。
+
 ### 修复
 
 - 库的 AAR 元数据不再要求消费者用 compileSdk 37.2 编译：本仓库为原生 backdrop 用 37.2 编译，AGP 默认把 `compileSdkMinor` 写进 AAR 元数据，1.6.0 与 1.6.1 因此迫使每个消费者也用 37.2（`checkAarMetadata` 失败）。原生 backdrop 只在内部隔离类里使用、按完整版本门控，公开签名不含 37.2 类型，现在显式只要求 37。证据：Meguviz 的 `meguviz-drawable-lumen` 与 `meguviz-ui-lumen-bridge`（compileSdk 37.0）在 1.6.1 上编译失败，改动后编译通过，前者设备契约 45/45 与探针观测和 1.5.5 逐行相同（`docs/MEGUVIZ_BRIDGE.md`）。JVM 契约 `ConsumerCompileSdkContractTest`。

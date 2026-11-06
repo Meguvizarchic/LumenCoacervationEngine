@@ -33,3 +33,7 @@ include(":lumen-assets")
 include(":lumen-assets-lottie")
 include(":lumen-assets-pag")
 include(":lumen-assets-rive")
+
+// 可选：Meguviz 家族桥（docs/MEGUVIZ_BRIDGE.md）。Meguviz 1.2.0 上 Maven Central 之前默认不进构建，
+// CI、JitPack 与不用 Meguviz 的宿主不受影响；本地联调用 -Plumen.meguviz=true，并以家族 init 脚本解析 staging。
+if (providers.gradleProperty("lumen.meguviz").orNull == "true") include(":lumen-bridge-meguviz-android")
