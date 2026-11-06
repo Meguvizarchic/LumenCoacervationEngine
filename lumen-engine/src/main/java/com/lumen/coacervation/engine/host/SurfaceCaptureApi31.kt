@@ -85,7 +85,8 @@ internal class SurfaceCaptureApi31 : AutoCloseable {
     override fun close() { content.release(); pixels = 0L }
 
     /**
-     * 每个绑定的透镜句柄。三段透镜程序（LIQUID、FROSTED、Prism）在进程内各只编译一次（[SharedPrograms]）：
+     * 每个绑定的透镜句柄。三段透镜程序（LIQUID、FROSTED、Prism）在进程内各只编译一次：LIQUID 与 FROSTED
+     * 见 [LiquidChromeLensApi33.shared] / [FrostedChromeLensApi33.shared]（与 Activity 悬浮栏分开两份），Prism 见 [SharedPrograms]。
      * 同一段 AGSL 每次 `RuntimeShader(String)` 都要重新编译（前台主线程约 1.1–1.5 ms），一页 8 个表面就是首帧
      * 约 9 ms。共享安全的前提是：只在主线程使用；每次建效果前由 [Glass] 写全本表面的 uniform
      * （强度与光学参数 + 几何）。RuntimeEffect 的 uniform 写时复制，已建的 RenderEffect 保留各自的快照——
@@ -104,20 +105,16 @@ internal class SurfaceCaptureApi31 : AutoCloseable {
         fun lens(material: LumenSurfaceMaterial, parameters: com.lumen.coacervation.engine.model.LiquidParameters, density: Float, strength: Float, counters: LumenGraphicsCounters? = null): Any? {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return null
             return if (material == LumenSurfaceMaterial.LIQUID) {
-                val current = liquid ?: (SharedPrograms.liquid ?: LiquidChromeLensApi33.create(parameters, density)
-                    .also { SharedPrograms.liquid = it; counters?.shaderCompiled() }).also { liquid = it }
+                val current = liquid ?: LiquidChromeLensApi33.shared(LiquidChromeLensApi33.SURFACES) { counters?.shaderCompiled() }.also { liquid = it }
                 LiquidChromeLensApi33.configure(current, parameters, density); current
             } else {
-                val current = frosted ?: (SharedPrograms.frosted ?: FrostedChromeLensApi33.create(strength)
-                    .also { SharedPrograms.frosted = it; counters?.shaderCompiled() }).also { frosted = it }
+                val current = frosted ?: FrostedChromeLensApi33.shared(FrostedChromeLensApi33.SURFACES) { counters?.shaderCompiled() }.also { frosted = it }
                 FrostedChromeLensApi33.configure(current, strength); current
             }
         }
 
         /** 进程级、仅主线程：持有不透明句柄（API 33 类型不出现在本 31+ 类的签名里）。 */
         private object SharedPrograms {
-            var frosted: Any? = null
-            var liquid: Any? = null
             var prism: Any? = null
         }
     }

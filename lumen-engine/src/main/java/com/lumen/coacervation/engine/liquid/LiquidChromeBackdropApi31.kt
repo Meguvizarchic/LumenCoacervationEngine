@@ -28,17 +28,22 @@ internal object LiquidChromeBackdropApi31 {
     private const val MAX_OPTICAL_INTENSITY = 1.85f
     private const val EDGE_SLACK_DP = 4f
 
-    /** 构造里会编译 AGSL；调用方负责把失败当作"节点路径不可用"。 */
+    /**
+     * 进程内首次调用会编译 AGSL（透镜程序共享，见 [LiquidChromeLensApi33.shared]）；调用方负责把失败当作
+     * "节点路径不可用"。
+     */
     fun create(parameters: LiquidParameters, density: Float): GlowChromeGlassApi31 {
         val blur = GlowChromeBlurApi31.create(CHROME_BLUR_RADIUS_DP * density)
         // Any 承载：RuntimeShader 是 API 33 类型，不能出现在本类（31+）的捕获字段里。
-        val lens: Any? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) LiquidChromeLensApi33.create(parameters, density) else null
+        val lens: Any? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) LiquidChromeLensApi33.shared(LiquidChromeLensApi33.CHROME) else null
         // 外沿覆盖折射 + 散射的最大取样距离，否则 shader 的越界收敛会把 rim 压平。
         val padding = ceil(
             ((parameters.refractionAmountDp + parameters.scatteringRadiusDp) * MAX_OPTICAL_INTENSITY + EDGE_SLACK_DP) * density
         ).toInt()
         return GlowChromeGlassApi31(padding) { width, height, pad, radiusPx, intensity, direction ->
             if (lens != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // 共享程序：每次建效果前写回本栏的光学参数，已建的效果保留各自的 uniform 快照。
+                LiquidChromeLensApi33.configure(lens, parameters, density)
                 LiquidChromeLensApi33.effect(lens, blur, width, height, pad, radiusPx, intensity, direction)
             } else blur
         }
@@ -48,14 +53,30 @@ internal object LiquidChromeBackdropApi31 {
 /** API 33 的折射透镜：与窗口玻璃同一段 AGSL，`content` 由 RenderEffect 喂入（已模糊的节点内容）。 */
 @RequiresApi(33)
 internal object LiquidChromeLensApi33 {
-    /** 返回不透明句柄，交回 [effect] 使用；调用方看不到 `RuntimeShader` 类型。 */
-    fun create(parameters: LiquidParameters, density: Float): Any =
-        RuntimeShader(ROUNDED_RECT_REFRACTION_SHADER).apply {
-            applyLiquidOpticalUniforms(parameters, density)
-        }
+    /** 共享程序的使用方：Activity 悬浮栏（所有栏同一组光学参数）与局部会话表面（逐表面参数）各一份。 */
+    const val CHROME = 0
+    const val SURFACES = 1
+    private val programs = arrayOfNulls<RuntimeShader>(2)
+    /** 每份程序上一次写入的光学参数：光学 uniform 只由 [configure] 写，参数没变就不必重写（约 20 次 JNI）。 */
+    private val configuredParameters = arrayOfNulls<LiquidParameters>(2)
+    private val configuredDensity = floatArrayOf(Float.NaN, Float.NaN)
+
+    /**
+     * 进程级、仅主线程的共享透镜程序，返回不透明句柄（调用方看不到 `RuntimeShader` 类型）。
+     * 同一段 AGSL 每次 `RuntimeShader(String)` 都要重新编译（Xiaomi 2210132C 前台主线程约 1.1–1.3 ms），
+     * [user] 的所有使用方共用一份，首次编译时回调 [onCompiled]。两类使用方分开：参数不同的使用方交替写同一份
+     * 程序会让每次效果重建多写一遍光学 uniform（同机约 +150 µs），悬浮栏回弹时逐帧重建，不能付这笔账。
+     * 共享的前提：每次建效果前先 [configure] 写回本表面的光学参数，再由 [effect] 写全几何；
+     * RuntimeEffect 的 uniform 写时复制，已建的 RenderEffect 保留各自的快照。
+     */
+    fun shared(user: Int, onCompiled: (() -> Unit)? = null): Any =
+        programs[user] ?: RuntimeShader(ROUNDED_RECT_REFRACTION_SHADER).also { programs[user] = it; onCompiled?.invoke() }
 
     fun configure(lens: Any, parameters: LiquidParameters, density: Float) {
+        val slot = if (lens === programs[CHROME]) CHROME else if (lens === programs[SURFACES]) SURFACES else -1
+        if (slot >= 0 && density == configuredDensity[slot] && parameters == configuredParameters[slot]) return
         (lens as RuntimeShader).applyLiquidOpticalUniforms(parameters, density)
+        if (slot >= 0) { configuredParameters[slot] = parameters; configuredDensity[slot] = density }
     }
 
     /**

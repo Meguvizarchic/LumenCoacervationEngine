@@ -6,6 +6,7 @@
 
 ### 性能
 
+- Activity 级悬浮栏的内容节点玻璃（Liquid 与柔光）在进程内共用透镜程序：此前每挂一条栏（演示首页顶栏、底栏、浮动按钮共 3 条）、每次重建页面都重新编译一段 AGSL。透镜对象自己持有共享程序，悬浮栏与局部会话各一份（两类使用方参数不同，交替写同一份程序会让每次效果重建多写一遍光学 uniform），并记下每份程序上次写入的参数，没变就不重写；局部会话的效果重建因此也省掉了重复写入。`ChromeLensSharingBenchmarkTest`（3 条栏，Xiaomi 2210132C API 33，基线与改动交替各 3 轮）：每条栏的窗口像素哈希逐个相同；重新登记一条栏 Liquid 1.11–1.40 ms → 5–6 µs、柔光 159–177 µs → 7–10 µs。`ChromeLensRebuildBenchmarkInstrumentedTest`：参数不变时"先写参数再建效果"与只建效果持平（中位 139–153 µs 对 141–155 µs）。`LensProgramSharingTest` 的 8 个局部表面像素哈希不变。JVM 契约 `SharedLensProgramContractTest`。
 - 局部会话的 GPU 透镜程序（LIQUID、FROSTED、Prism 三段 AGSL）在进程内各只编译一次：此前每个绑定、每次重新绑定都重新编译（前台主线程单次约 1.1–1.5 ms，一页 8 个表面约 9 ms，集中在首帧）。每次建效果前写回本表面的强度与光学参数，RuntimeEffect 的 uniform 写时复制保证各效果保留自己的快照。`LensProgramSharingTest`（8 个表面、两种材质各两档强度，Xiaomi 2210132C API 33，基线与改动交替各 2×3 轮）：8 个表面的窗口像素哈希逐个相同；本会话着色器构建 8 → 1；绑定后首帧绘制 7.1–9.6 ms → 3.0–5.6 ms。JVM 契约 `SharedLensProgramContractTest`。
 
 ### 测试

@@ -42,12 +42,14 @@ internal object FrostedChromeGlassApi31 {
         )))
         val lit = RenderEffect.createColorFilterEffect(illuminate, blur)
         // Any 承载：RuntimeShader 是 API 33 类型，不能出现在本类（31+）的捕获字段里。
-        val lens: Any? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) FrostedChromeLensApi33.create() else null
+        val lens: Any? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) FrostedChromeLensApi33.shared(FrostedChromeLensApi33.CHROME) else null
         // 边沿外推最多取到表面外 MARGIN_DP：与软件管线的外沿采样区一致。
         val padding = LensRefractionPolicy.marginPx(density) + (EDGE_SLACK_DP * density).toInt()
         return GlowChromeGlassApi31(padding) { width, height, pad, _, _, _ ->
             if (lens != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 // API 33+ 在透镜中按预乘 alpha 提亮，避免额外颜色滤镜的透明边界处理。
+                // 共享程序：每次建效果前写回本栏的强度，已建的效果保留各自的 uniform 快照。
+                FrostedChromeLensApi33.configure(lens, 1f)
                 FrostedChromeLensApi33.effect(lens, blur, width, height, pad)
             } else lit
         }
@@ -56,7 +58,21 @@ internal object FrostedChromeGlassApi31 {
 
 @RequiresApi(33)
 internal object FrostedChromeLensApi33 {
-    /** 返回不透明句柄，交回 [effect] 使用；调用方看不到 `RuntimeShader` 类型。 */
+    /** 共享程序的使用方：Activity 悬浮栏（强度恒为 1）与局部会话表面（逐表面强度）各一份，见 [LiquidChromeLensApi33.shared]。 */
+    const val CHROME = 0
+    const val SURFACES = 1
+    private val programs = arrayOfNulls<Any>(2)
+    /** 每份程序上一次写入的强度：强度相关的 uniform 只由 [configure] 写，没变就不必重写。 */
+    private val configuredStrength = floatArrayOf(Float.NaN, Float.NaN)
+
+    /**
+     * 进程级、仅主线程的共享透镜程序，[user] 的所有使用方共用一份，首次编译时回调 [onCompiled]。
+     * 强度相关的 uniform 由使用方每次建效果前 [configure] 写回，其余 uniform 对所有使用方相同。
+     */
+    fun shared(user: Int, onCompiled: (() -> Unit)? = null): Any =
+        programs[user] ?: create().also { programs[user] = it; onCompiled?.invoke() }
+
+    /** 独立实例（不与他人共享 uniform），返回不透明句柄，交回 [effect] 使用；调用方看不到 `RuntimeShader` 类型。 */
     fun create(strength: Float = 1f): Any = RuntimeShader(SOFT_LENS_SHADER).apply {
         setFloatUniform("gain", LensRefractionPolicy.CENTER_GAIN_X * strength, LensRefractionPolicy.CENTER_GAIN_Y * strength)
         setFloatUniform("push", LensRefractionPolicy.RIM_PUSH_X * strength, LensRefractionPolicy.RIM_PUSH_Y * strength)
@@ -66,6 +82,9 @@ internal object FrostedChromeLensApi33 {
     }
 
     fun configure(lens: Any, strength: Float) {
+        val slot = if (lens === programs[CHROME]) CHROME else if (lens === programs[SURFACES]) SURFACES else -1
+        if (slot >= 0 && strength == configuredStrength[slot]) return
+        if (slot >= 0) configuredStrength[slot] = strength
         val shader = lens as RuntimeShader
         shader.setFloatUniform("gain", LensRefractionPolicy.CENTER_GAIN_X * strength, LensRefractionPolicy.CENTER_GAIN_Y * strength)
         shader.setFloatUniform("push", LensRefractionPolicy.RIM_PUSH_X * strength, LensRefractionPolicy.RIM_PUSH_Y * strength)
