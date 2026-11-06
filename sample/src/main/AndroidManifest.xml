@@ -9,7 +9,9 @@
         android:supportsRtl="true"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="33"
-        android:theme="@style/Theme.LumenSample">
+        android:theme="@style/Theme.LumenSample"
+        android:icon="@mipmap/ic_lumen"
+        android:roundIcon="@mipmap/ic_lumen">
         <activity
             android:name=".SampleActivity"
             android:exported="true">
