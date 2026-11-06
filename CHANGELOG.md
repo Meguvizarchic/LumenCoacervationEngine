@@ -6,6 +6,7 @@
 
 ### 修复
 
+- 库的 AAR 元数据不再要求消费者用 compileSdk 37.2 编译：本仓库为原生 backdrop 用 37.2 编译，AGP 默认把 `compileSdkMinor` 写进 AAR 元数据，1.6.0 与 1.6.1 因此迫使每个消费者也用 37.2（`checkAarMetadata` 失败）。原生 backdrop 只在内部隔离类里使用、按完整版本门控，公开签名不含 37.2 类型，现在显式只要求 37。证据：Meguviz 的 `meguviz-drawable-lumen` 与 `meguviz-ui-lumen-bridge`（compileSdk 37.0）在 1.6.1 上编译失败，改动后编译通过，前者设备契约 45/45 与探针观测和 1.5.5 逐行相同（`docs/MEGUVIZ_BRIDGE.md`）。JVM 契约 `ConsumerCompileSdkContractTest`。
 - 实时取样 Liquid 页面关闭后可能被热状态监听留住：PowerManager 把监听包成 Binder 存根交给系统进程，注销后存根要等系统进程 GC 才释放，此前登记出去的监听经监视器 → 性能协调器 → 渲染器一路捕获到 Activity。现在登记的是只经一个可清空引用回到监视器的中转对象，停止时清空。证据：Demo APK（7e1c3b6）API 31 的 `LifecycleLeakDiagnosticTest` 等满 10 秒后仍有 4 个 `SliderSandboxActivity` 存活，导出的 hprof 引用链为 `PowerManager$3`（JNI 全局引用）→ `LiquidThermalMonitorApi29` → `LiquidPerformanceController` → `LiquidActivityRenderer` → Activity。新增 `ThermalListenerReleaseInstrumentedTest`：停止后继续持有登记出去的监听（模拟远端尚未释放），回调链必须可回收；改动前在 API 34 模拟器与 Xiaomi 2210132C 上失败，改动后通过。
 
 ### 性能
