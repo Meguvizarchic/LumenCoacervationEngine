@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 修复
+
+- 实时取样 Liquid 页面关闭后可能被热状态监听留住：PowerManager 把监听包成 Binder 存根交给系统进程，注销后存根要等系统进程 GC 才释放，此前登记出去的监听经监视器 → 性能协调器 → 渲染器一路捕获到 Activity。现在登记的是只经一个可清空引用回到监视器的中转对象，停止时清空。证据：Demo APK（7e1c3b6）API 31 的 `LifecycleLeakDiagnosticTest` 等满 10 秒后仍有 4 个 `SliderSandboxActivity` 存活，导出的 hprof 引用链为 `PowerManager$3`（JNI 全局引用）→ `LiquidThermalMonitorApi29` → `LiquidPerformanceController` → `LiquidActivityRenderer` → Activity。新增 `ThermalListenerReleaseInstrumentedTest`：停止后继续持有登记出去的监听（模拟远端尚未释放），回调链必须可回收；改动前在 API 34 模拟器与 Xiaomi 2210132C 上失败，改动后通过。
+
 ### 性能
 
 - Activity 级悬浮栏的内容节点玻璃（Liquid 与柔光）在进程内共用透镜程序：此前每挂一条栏（演示首页顶栏、底栏、浮动按钮共 3 条）、每次重建页面都重新编译一段 AGSL。透镜对象自己持有共享程序，悬浮栏与局部会话各一份（两类使用方参数不同，交替写同一份程序会让每次效果重建多写一遍光学 uniform），并记下每份程序上次写入的参数，没变就不重写；局部会话的效果重建因此也省掉了重复写入。`ChromeLensSharingBenchmarkTest`（3 条栏，Xiaomi 2210132C API 33，基线与改动交替各 3 轮）：每条栏的窗口像素哈希逐个相同；重新登记一条栏 Liquid 1.11–1.40 ms → 5–6 µs、柔光 159–177 µs → 7–10 µs。`ChromeLensRebuildBenchmarkInstrumentedTest`：参数不变时"先写参数再建效果"与只建效果持平（中位 139–153 µs 对 141–155 µs）。`LensProgramSharingTest` 的 8 个局部表面像素哈希不变。JVM 契约 `SharedLensProgramContractTest`。
