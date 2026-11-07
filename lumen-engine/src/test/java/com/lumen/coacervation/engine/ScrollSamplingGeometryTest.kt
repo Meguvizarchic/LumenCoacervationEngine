@@ -46,6 +46,17 @@ class ScrollSamplingGeometryTest {
         assertTrue(footprint.needsRefresh(relative(translation(0f, -120f), target)))
     }
 
+    @Test fun initializationIsExposedSoScrollCanAvoidSkippingAnUnrecordedFootprint() {
+        val footprint = ScrollSamplingGeometry()
+        assertFalse(footprint.isInitialized)
+        footprint.record(translation(2f, 3f))
+        assertTrue(footprint.isInitialized)
+        // 未登记时 needsRefresh 恒为真；登记后相同的矩阵不再刷新。
+        val unrecorded = ScrollSamplingGeometry()
+        assertTrue(unrecorded.needsRefresh(translation(2f, 3f)))
+        assertFalse(footprint.needsRefresh(translation(2f, 3f)))
+    }
+
     @Test fun invalidGeometryNeverPublishesOrRequestsAReplacementFootprint() {
         val footprint = ScrollSamplingGeometry()
         val initial = translation(2f, 3f)

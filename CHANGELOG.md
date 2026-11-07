@@ -26,6 +26,7 @@
 ### 性能
 
 - 软件透镜采样批次的主线程分配：`collectJobs` 复用两张临时列表、批次拆分改用复用的数组成本（`LensBatchSplit.secondHalf(groups, LongArray, processors)`，结果与列表版本相同）、逐表面准备去掉 `Result` 包装。`SamplerBatchAllocationBenchmarkTest`（4 个软件后端表面、内容逐帧变化，Xiaomi 2210132C API 33，基线与改动交替各 2 轮）：每次采样请求主线程分配 2,754–2,756 B → 2,658–2,662 B（含测试夹具与 View 遍历本身的分配），像素回归不变。
+- 滚动通知不再重算「源与目标都在同一滚动容器内」的相对采样矩阵：`notifyScrollPositionChanged` 在源随容器移动、目标也在该容器内、且该表面已成功登记过几何时，跳过整条祖先链重算与随后的 `failure()` 复查（`ScrollSamplingGeometry` 新增只读 `isInitialized`，未登记过几何的表面仍走原路径）。容器滚动对两者施加同一平移，相对矩阵不变，与 `needsRefresh` 的结论一致；`docs/SURFACE_SESSIONS.md` 的位置通知协议本就如此要求。宿主探针 `ScrollRelativeMatrixSkipProbeTest`（纯 JVM，复用真实 `SamplingMatrixMath`/`ScrollSamplingGeometry`/`ScrollSurfaceScope`）：16 卡每次滚动通知重算 800 → 0 次、1.456 ms → 0；4 卡 200 → 0 次、70.3 µs → 0；新旧口径对每个表面的结论逐条一致。新增 `ScrollRelativeMatrixSkipContractTest`。未跑真机桥基准。
 
 ### 新增
 

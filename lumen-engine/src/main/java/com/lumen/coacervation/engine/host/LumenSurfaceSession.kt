@@ -425,6 +425,10 @@ public class LumenSurfaceSession @JvmOverloads constructor(
                     c.sampling.backend == LumenSurfaceBackend.STATIC || c.opacity == 0f ||
                     !entry.target.isShown || entry.target.alpha <= 0f || entry.installsBackground && host.background !== entry.drawable) continue
                 if (!sourceMoved && !ScrollSurfaceScope.contains(host, scrollHost) { it.parent as? View }) continue
+                // 源与目标都在该滚动容器内：容器滚动对两者施加同一平移，相对采样矩阵不变（整数滚动下逐位相同），
+                // 与 needsRefresh 的结论一致，跳过整条祖先链重算与 failure 复查。未登记过几何的条目仍走原路径。
+                if (sourceMoved && entry.scrollGeometry.isInitialized &&
+                    ScrollSurfaceScope.contains(host, scrollHost) { it.parent as? View }) continue
                 if (failure(host, entry) != LumenSurfaceFailure.NONE) continue
                 if (!entry.sourceToTarget(content, scrollSampleMatrix)) continue
                 scrollSampleMatrix.getValues(scrollMatrixValues)
