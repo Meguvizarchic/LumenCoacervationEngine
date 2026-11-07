@@ -21,28 +21,42 @@
 ## 最小接入
 
 ```kotlin
-// build.gradle.kts
+// build.gradle.kts：桥已经带上 meguviz-android-window 与 meguviz-android-lifecycle，版本由 BOM 对齐
 implementation("com.github.jichuo1.LumenCoacervationEngine:lumen-bridge-meguviz-android:<版本>")
 implementation(platform("io.github.jichuo1.meguviz:meguviz-bom:1.2.0"))
-implementation("io.github.jichuo1.meguviz:meguviz-android-lifecycle")
 
-// Activity.onCreate
-val window = WindowSession.open(getWindow(), this, packageName, WindowSession.Permission.OBSERVE)
-LifecycleAdapters.bindWindow(this, window)
-val surfaces = window.openLumenSurfaces()          // 配色默认跟随当前深浅色
+// Activity.onCreate（Activity 须是 LifecycleOwner，例如 AppCompatActivity）
+val surfaces = openLumenSurfaces()
 surfaces.bind(card, LumenSurfacePresets.card(), content)
 ```
 
-不需要写 `onDestroy`：Activity 销毁时 Meguviz 关闭窗口会话，登记在它上面的 Lumen 会话随之关闭。Java 调用方写
-`LumenMeguvizWindow.openLumenSurfaces(window)`。
+一行就够：桥在本 Activity 的窗口上打开只读的 Meguviz 窗口会话（`Permission.OBSERVE`），交给 Activity 生命周期，再开 Lumen 会话。
+不需要写 `onDestroy`，也不需要自己调用 `LifecycleAdapters.bindWindow`。Java 调用方写 `LumenMeguvizActivity.openLumenSurfaces(activity)`。
 
-规则：
+| 情况 | 行为 |
+|---|---|
+| 同一 Activity 再次调用（例如写在 `onResume`） | 返回同一个未关闭的会话，不会叠出第二个 |
+| 再次调用但参数不同 | 抛 `IllegalStateException`，不会悄悄忽略新参数 |
+| 宿主先 `close()` 了会话 | 下一次调用重新打开 |
+| 不传 `palette` | 取当前深浅色的 `LumenPalette.neutral`；Activity 自己处理 `uiMode` 变化（不重建）时自动跟随 |
+| 传了 `palette` | 原样使用，不被改写 |
+| 非主线程、Activity 已销毁 | 抛 `IllegalStateException` |
+| Activity 不是 `LifecycleOwner`（裸 `android.app.Activity`） | 抛 `IllegalArgumentException`，提示改用 ComponentActivity 或下面的窗口会话写法 |
+| Activity 销毁 | Meguviz 关闭窗口会话，Lumen 会话随之关闭 |
 
-- 在窗口会话的所有者线程（主线程）调用。窗口会话已关闭或不再接受登记时抛 `IllegalStateException`，不会留下无人关闭的会话。
-- 暂停与恢复由宿主决定（`surfaces.pause()` / `resume()`）。`WindowSession` 没有可订阅的可见性事件，桥不猜测。
-- 宿主自己处理深浅色变化、不重建 Activity（`configChanges="uiMode"`）时，在 `onConfigurationChanged` 里先
-  `window.refreshConfiguration()`，再 `surfaces.updatePalette(LumenPalette.neutral(night))`；默认配色只在创建时取一次。
-- 多窗口：每个窗口各开一个 `WindowSession` 与一个 Lumen 会话，桥把两者一一绑定。
+宿主已经自己管理 `WindowSession` 时，在它上面开会话：
+
+```kotlin
+val surfaces = window.openLumenSurfaces()   // Java：LumenMeguvizWindow.openLumenSurfaces(window)
+```
+
+这条写法的窗口会话由宿主负责关闭（通常用 `LifecycleAdapters.bindWindow`）；窗口会话已关闭或不再接受登记时抛 `IllegalStateException`，
+不会留下无人关闭的会话。默认配色只在创建时取一次。
+
+不自动暂停：退到后台时 Lumen 会话本来就不工作（见下文"验证"：后台 5 s 主线程唤醒 0 次，后台 PSS 与不用桥相同），自动暂停省不下
+资源，回到前台还要重建一次。需要时宿主自己调用 `pause()` / `resume()`。
+
+多窗口：每个窗口各开一个窗口会话与一个 Lumen 会话，一一绑定。
 
 ## 构建
 
@@ -56,22 +70,35 @@ python D:/DevArea/MeguvizFamily/family.py bom --output <bom-repo>/io/github/jich
     :sample:assembleRelease :sample:assembleReleaseAndroidTest
 ```
 
-开关打开时 sample 多一个桌面入口"Lumen × Meguviz"（`MeguvizBridgeActivity`）和设备测试 `MeguvizBridgeTest`。
+开关打开时 sample 多一个桌面入口"Lumen × Meguviz"（`MeguvizBridgeActivity`，可滚动的条纹内容上四张玻璃卡片），以及设备测试
+`MeguvizBridgeTest`（生命周期与一行接入的契约）和 `MeguvizBridgeBenchmarkTest`（三种写法的实测对照）。
 
-## 验证（2026-11-06）
+## 验证（2026-11-07）
 
-Xiaomi 2210132C（API 33）；`MeguvizBridgeTest`，桥接与"两套各自管理"（`forActivity` + 窗口会话）交替各 3 轮、跑 2 次：
+Xiaomi 2210132C（API 33）；`MeguvizBridgeBenchmarkTest`，三种写法交替各 4 轮：只用 Lumen（`forActivity`，不引入 Meguviz）、
+Meguviz 与 Lumen 各自管理生命周期、桥接（一行接入）。
 
-| 指标 | 桥接 | 两套各自管理 |
-|---|---|---|
-| 4 张卡片的窗口像素哈希 | 逐个相同 | 逐个相同 |
-| 接入耗时（打开窗口会话到全部绑定） | 0.74–0.92 ms | 0.75–2.91 ms |
-| 静止 1.5 s 的出帧数 | 0 | 0 |
-| 冷启动 `am start -W` TotalTime（5 次，去掉首次预热） | 323–372 ms | 321–402 ms |
-| PSS / Java 堆 | 140.2–140.5 MB / 3.3 MB | 139.5–140.5 MB / 3.3 MB |
+| 指标 | 只用 Lumen | 各自管理 | 桥接 |
+|---|---|---|---|
+| 4 张卡片的窗口像素哈希（含退到后台再回来） | 逐个相同 | 逐个相同 | 逐个相同 |
+| 首帧（onCreate 到首帧提交，去掉首轮预热） | 30.7–70.5 ms | 29.0–41.6 ms | 38.8–56.2 ms |
+| 滚动帧 TOTAL p50 | 8.53–11.15 ms | 10.64–11.75 ms | 10.56–11.49 ms |
+| 滚动帧 TOTAL p90 | 10.43–17.46 ms | 16.95–25.68 ms | 17.33–25.44 ms |
+| 静止 5 s 主线程唤醒 / 出帧 | 56–61 / 0 | 35–63 / 0 | 38–68 / 0 |
+| 后台 5 s 主线程唤醒 | 0 | 0 | 0 |
+| 前台 PSS / 后台 PSS | 156.3–159.2 / 81.3–82.6 MB | 156.0–158.2 / 80.9–83.6 MB | 156.0–157.0 / 80.6–82.0 MB |
+| 一次接入的平均分配（40 次取均值） | 25.4 KB | 31.9–32.4 KB | 31.9–32.4 KB |
+| 冷启动 `am start -W -S`（8 次） | 334–423 ms | 342–392 ms | 336–400 ms |
 
-两种写法没有可测量的性能差别；本桥的收益是接入更短、关闭顺序不会写错，不宣称性能提升。Activity 销毁后窗口会话与 Lumen 会话都已关闭；
-已关闭的窗口会话拒绝再开会话。
+结论：
+
+- FrameScheduler 与 Choreographer 没有重复调度：静止时三种写法都不出帧，主线程唤醒在同一量级（来自系统与测试本身）；后台都是 0。
+  Meguviz 的帧调度器只在有人申请帧通道时才挂 Choreographer 回调，本页面没有。
+- 引入 Meguviz 的固定开销是每个窗口约 7 KB 分配（窗口会话自己的调度器、资源作用域等），桥接与各自管理相同；这部分属于 Meguviz。
+- 三种写法在帧耗时、内存、冷启动上没有可分辨的差别；桥的收益是接入更短、不容易用错，不宣称性能提升。
+
+Activity 销毁后窗口会话与 Lumen 会话都已关闭；已关闭的窗口会话拒绝再开会话；一行接入的幂等、参数冲突、深浅色跟随与非主线程报错
+由 `MeguvizBridgeTest` 守住。
 
 默认构建（开关关闭）的 sample APK 与 `lumen-engine` AAR 与未改动的 main 逐项比对：dex、清单与资源相同，差异只有 worktree 检出的换行
 （LICENSE、proguard.txt）与 AGP 的版本控制信息。

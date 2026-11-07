@@ -43,6 +43,9 @@ dependencies {
     // 家族版本只在 BOM 里写一次：window 与它传递的 runtime 都由 BOM 对齐。
     api(platform(libs.meguviz.bom))
     api(libs.meguviz.android.window)
+    // 一行接入（Activity.openLumenSurfaces）把窗口会话交给 Activity 生命周期。
+    api(libs.meguviz.android.lifecycle)
+    implementation(libs.androidx.core.ktx)
     testImplementation(libs.junit)
 }
 
