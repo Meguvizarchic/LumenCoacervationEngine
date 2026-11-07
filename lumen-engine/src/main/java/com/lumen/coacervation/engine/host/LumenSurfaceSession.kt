@@ -425,9 +425,16 @@ public class LumenSurfaceSession @JvmOverloads constructor(
                     c.sampling.backend == LumenSurfaceBackend.STATIC || c.opacity == 0f ||
                     !entry.target.isShown || entry.target.alpha <= 0f || entry.installsBackground && host.background !== entry.drawable) continue
                 if (!sourceMoved && !ScrollSurfaceScope.contains(host, scrollHost) { it.parent as? View }) continue
-                // 源与目标都在该滚动容器内：容器滚动对两者施加同一平移，相对采样矩阵不变（整数滚动下逐位相同），
-                // 与 needsRefresh 的结论一致，跳过整条祖先链重算与 failure 复查。未登记过几何的条目仍走原路径。
-                if (sourceMoved && entry.scrollGeometry.isInitialized &&
+                // 源与目标都在该滚动容器内：容器滚动对两者施加同一平移，相对采样矩阵数学上不变，
+                // 跳过整条祖先链重算与 failure 复查。未登记过几何的条目仍走原路径。
+                //
+                // 只对 installsBackground 的条目跳过：这类条目的 target 就是 host View，视图链关系成立。
+                // 自定义 target 的 coordinateView 按接口契约只标识窗口（见 LumenSurfaceTarget），其真实几何
+                // 不一定跟随 coordinateView 的滚动容器，跳过会抑制必要的重算。
+                //
+                // 另外调用方必须传「实际发生滚动」的那个 View：传它的祖先会让 source/target 都被判定在
+                // 容器内，从而漏掉真正的滚动容器移动。
+                if (sourceMoved && entry.installsBackground && entry.scrollGeometry.isInitialized &&
                     ScrollSurfaceScope.contains(host, scrollHost) { it.parent as? View }) continue
                 if (failure(host, entry) != LumenSurfaceFailure.NONE) continue
                 if (!entry.sourceToTarget(content, scrollSampleMatrix)) continue

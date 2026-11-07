@@ -17,12 +17,16 @@ class ScrollRelativeMatrixSkipContractTest {
         val session = SourceContract.read("host/LumenSurfaceSession.kt")
         val scroll = session.after("public fun notifyScrollPositionChanged(scrollHost: View)").before("public fun pause()")
         val scopeFilter = scroll.indexOf("if (!sourceMoved && !ScrollSurfaceScope.contains(host, scrollHost)")
-        val skip = scroll.indexOf("sourceMoved && entry.scrollGeometry.isInitialized")
+        val skip = scroll.indexOf("sourceMoved && entry.installsBackground && entry.scrollGeometry.isInitialized")
         val skipTail = scroll.indexOf("ScrollSurfaceScope.contains(host, scrollHost) { it.parent as? View }) continue", skip)
         val feedbackCheck = scroll.indexOf("if (failure(host, entry) != LumenSurfaceFailure.NONE)")
         assertTrue("既有作用域过滤必须仍在", scopeFilter >= 0)
         assertTrue("跳过必须要求源与目标都在容器内", skip >= 0)
         assertTrue("跳过必须要求已登记过几何", skip >= 0 && scroll.substring(skip).contains("isInitialized"))
+        // Custom targets only promise that coordinateView identifies their window, so the skip must be
+        // restricted to entries whose target really is the host View.
+        assertTrue("跳过必须要求 installsBackground（自定义 target 几何不保证跟随容器）",
+            skip >= 0 && scroll.substring(skip).contains("installsBackground"))
         assertTrue("跳过必须完整到 continue", skipTail > skip)
         assertTrue("跳过仍排在 failure 之前", skip < feedbackCheck)
         assertTrue("原有作用域过滤仍排在跳过之前", scopeFilter < skip)

@@ -93,13 +93,16 @@ class ScrollRelativeMatrixSkipProbeTest {
         return geometry.needsRefresh(probe.lastMatrix)
     }
 
-    /** 新口径：源与目标都在容器内且已登记过几何时跳过；其余与旧口径逐句相同。 */
+    /**
+     * 新口径：源与目标都在容器内、已登记过几何、且 target 就是 host View（installsBackground）时跳过；
+     * 其余与旧口径逐句相同。自定义 target 的 coordinateView 只标识窗口，不能据此推断几何，因此不跳过。
+     */
     private fun newDecision(
         probe: MatrixProbe, geometry: ScrollSamplingGeometry, source: Node, target: Node,
-        scrollHost: Node, sourceMoved: Boolean
+        scrollHost: Node, sourceMoved: Boolean, installsBackground: Boolean = true
     ): Boolean {
         if (!sourceMoved && !contains(target, scrollHost)) return false
-        if (sourceMoved && geometry.isInitialized && contains(target, scrollHost)) return false
+        if (sourceMoved && installsBackground && geometry.isInitialized && contains(target, scrollHost)) return false
         if (!probe.sourceToTarget(source, target)) return false
         return geometry.needsRefresh(probe.lastMatrix)
     }
@@ -240,6 +243,26 @@ class ScrollRelativeMatrixSkipProbeTest {
         val newDecision = newDecision(newProbe, geometry, scroll, card, scroll, sourceMoved)
         assertEquals(oldDecision, newDecision)
         assertEquals("源就是滚动容器时不能跳过", 1L, newProbe.calls)
+    }
+
+    @Test
+    fun customTargetWithoutBackgroundIsNeverSkipped() {
+        // coordinateView only names the window for custom targets, so the skip must not apply even
+        // though the node happens to sit inside the scrolling container in this fixture. The fixture's
+        // relative matrix genuinely does not change, so the observable difference is whether the
+        // whole ancestor chain is recomputed at all.
+        val fix = fixture(cardCount = 4)
+        val geometries = fix.cards.map { recorded(it, fix.content) }
+        fix.scroll.scrollY = 400
+        val background = MatrixProbe()
+        val custom = MatrixProbe()
+        repeat(fix.cards.size) {
+            newDecision(background, geometries[it], fix.content, fix.cards[it], fix.scroll, fix.sourceMoved)
+            newDecision(custom, geometries[it], fix.content, fix.cards[it], fix.scroll, fix.sourceMoved,
+                installsBackground = false)
+        }
+        assertEquals("installsBackground 的条目被跳过", 0L, background.calls)
+        assertEquals("自定义 target 仍会走完整重算", 4L, custom.calls)
     }
 
     @Test
