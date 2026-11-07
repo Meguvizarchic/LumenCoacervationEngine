@@ -49,7 +49,7 @@ class ExpandedAccordionHeaderTest {
         WindowRegressionCapture.main { f.root.clipBounds = foreign }
         WindowRegressionCapture.frame(f.pager)
         val point = f.point()
-        val down = hold(point, 0f, 120f)
+        val down = hold(point, 0f, 120f, f.header)
         WindowRegressionCapture.main {
             assertTrue("An additional outer crop must not be discarded", f.card.translationY in 0f..1f)
             assertEquals(foreign, f.root.clipBounds)
@@ -61,7 +61,7 @@ class ExpandedAccordionHeaderTest {
 
     @Test fun regrabbingAndLeavingThePageReleaseTheHeaderCropWithoutRevivingIt() = withFixture { f ->
         val point = f.point()
-        val down = hold(point, 0f, 120f)
+        val down = hold(point, 0f, 120f, f.header)
         lateinit var ownedCrop: Rect
         WindowRegressionCapture.main {
             assertTrue(f.card.translationY > f.minimumDrag)
@@ -69,7 +69,7 @@ class ExpandedAccordionHeaderTest {
         }
         send(down, MotionEvent.ACTION_UP, point[0], point[1] + 120f)
         val nextPoint = f.point()
-        val nextDown = hold(nextPoint, 0f, 120f)
+        val nextDown = hold(nextPoint, 0f, 120f, f.header)
         WindowRegressionCapture.main {
             assertTrue("The page crop must allow a release regrab", f.card.translationY > f.minimumDrag)
             assertEquals(ownedCrop, f.card.clipBounds)
@@ -87,7 +87,7 @@ class ExpandedAccordionHeaderTest {
 
     @Test fun invalidationPreservesAForeignCropWhileRestoringTheHeldTransform() = withFixture { f ->
         val point = f.point()
-        val down = hold(point, 0f, 120f)
+        val down = hold(point, 0f, 120f, f.header)
         val foreign = Rect(0, 0, f.card.width, f.pager.height - f.contentTop - f.size(40))
         WindowRegressionCapture.main { assertNotNull(f.card.clipBounds); f.card.clipBounds = foreign }
         WindowRegressionCapture.frame(f.pager)
@@ -103,11 +103,11 @@ class ExpandedAccordionHeaderTest {
 
     @Test fun aDifferentChildUnderTheScaledCardDoesNotInheritItsGesture() = withFixture { f ->
         val point = f.point()
-        val down = hold(point, 0f, 120f)
+        val down = hold(point, 0f, 120f, f.header)
         WindowRegressionCapture.main { assertTrue(f.card.translationY > f.minimumDrag) }
         send(down, MotionEvent.ACTION_UP, point[0], point[1] + 120f)
         val childPoint = f.point(f.body)
-        val childDown = hold(childPoint, 0f, 120f)
+        val childDown = hold(childPoint, 0f, 120f, f.body)
         WindowRegressionCapture.main {
             assertEquals("A different child cannot continue the card's lease", 0f, f.body.translationY, 0f)
             assertRestored(f)
@@ -133,7 +133,7 @@ class ExpandedAccordionHeaderTest {
         }
         for ((dx, dy) in listOf(-120f to 0f, 120f to 0f, 0f to -120f, 0f to 120f)) {
             val point = f.point()
-            val down = hold(point, dx, dy)
+            val down = hold(point, dx, dy, f.header)
             WindowRegressionCapture.frame(f.pager)
             WindowRegressionCapture.main {
                 if (dx != 0f) assertTrue("Promoted header must follow horizontal drag", f.card.translationX * dx > f.minimumDrag * kotlin.math.abs(dx))
@@ -269,10 +269,24 @@ class ExpandedAccordionHeaderTest {
         }
     }
 
-    private fun hold(point: FloatArray, dx: Float, dy: Float): Long {
+    /**
+     * 按住 [pressed] 再拖动一次。控件在滚动容器里时，原生按下状态由 tapTimeout 后的一条主线程消息设置；主线程卡顿时
+     * 这条消息可能排在 MOVE 之后，引擎按设计不接管一个尚未确认收到事件流的控件（2026-11-06 CI API 31 失败，本地 DOWN
+     * 后卡住主线程 400 ms 必现）。所以先等按下状态确实建立，再在不早于原来 190 ms 的时刻发 MOVE；
+     * `sendPointerSync` 返回时 MOVE 已被分发处理。
+     */
+    private fun hold(point: FloatArray, dx: Float, dy: Float, pressed: View): Long {
         val down = SystemClock.uptimeMillis()
         send(down, MotionEvent.ACTION_DOWN, point[0], point[1])
-        SystemClock.sleep(190)
+        val deadline = down + 5000
+        var isPressed = false
+        while (!isPressed && SystemClock.uptimeMillis() < deadline) {
+            WindowRegressionCapture.main { isPressed = pressed.isPressed }
+            if (!isPressed) SystemClock.sleep(10)
+        }
+        assertTrue("The held view never entered its native pressed state", isPressed)
+        val remaining = down + HOLD_BEFORE_MOVE_MS - SystemClock.uptimeMillis()
+        if (remaining > 0) SystemClock.sleep(remaining)
         send(down, MotionEvent.ACTION_MOVE, point[0] + dx, point[1] + dy)
         return down
     }
@@ -283,4 +297,8 @@ class ExpandedAccordionHeaderTest {
         try { InstrumentationRegistry.getInstrumentation().sendPointerSync(event) } finally { event.recycle() }
     }
 
+    private companion object {
+        /** 与原来的固定等待相同：比长按门槛（ElasticMotionPolicy.HOLD_MILLIS = 160 ms）多出余量。 */
+        const val HOLD_BEFORE_MOVE_MS = 190L
+    }
 }

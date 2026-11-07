@@ -14,6 +14,7 @@ import android.view.MotionEvent
 import androidx.compose.ui.geometry.Offset
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.platform.ComposeView
+import android.view.Choreographer
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
@@ -48,14 +49,42 @@ class NativeComposeIntegrationTest {
         assertTrue(message, ready)
     }
 
-    private fun ready(scenario: ActivityScenario<ComposeSandboxActivity>) {
-        val expected = if (Build.VERSION.SDK_INT >= 31) LumenSurfaceBackend.GPU else LumenSurfaceBackend.SOFTWARE
-        await(scenario, "Native surfaces did not sample the Compose backdrop") { a ->
-            a.stateReady && a.composeView.hasWindowFocus() && a.composeView.width > 0 &&
-                listOf(ComposeSandboxActivity.CARD, ComposeSandboxActivity.INPUT, ComposeSandboxActivity.SELECTION)
-                    .all { a.lumenState.bindingFor(it)?.diagnostics()?.backend == expected } &&
-                a.lumenState.session.diagnostics().attachedSurfaces >= 4
+    /** 录制次数连续 [frames] 个 vsync 不变才返回；7 s 内收不敛就失败（那说明录制在持续发生）。 */
+    private fun awaitStableRecordings(scenario: ActivityScenario<ComposeSandboxActivity>, frames: Int = 10) {
+        val deadline = SystemClock.uptimeMillis() + 7000
+        var last = -1L
+        var stable = 0
+        while (stable < frames) {
+            assertTrue("Content recordings did not settle: $last", SystemClock.uptimeMillis() < deadline)
+            val vsync = CountDownLatch(1)
+            var now = 0L
+            scenario.onActivity {
+                now = it.lumenState.session.diagnostics().contentRecordings
+                Choreographer.getInstance().postFrameCallback { vsync.countDown() }
+            }
+            assertTrue("No vsync arrived", vsync.await(2, TimeUnit.SECONDS))
+            stable = if (now == last) stable + 1 else 0
+            last = now
         }
+    }
+
+    private fun ready(scenario: ActivityScenario<ComposeSandboxActivity>,
+        expected: LumenSurfaceBackend = if (Build.VERSION.SDK_INT >= 31) LumenSurfaceBackend.GPU else LumenSurfaceBackend.SOFTWARE) {
+        val keys = listOf(ComposeSandboxActivity.CARD, ComposeSandboxActivity.INPUT, ComposeSandboxActivity.SELECTION)
+        var seen = ""
+        val deadline = SystemClock.uptimeMillis() + 7000
+        var ok = false
+        while (!ok && SystemClock.uptimeMillis() < deadline) {
+            scenario.onActivity { a ->
+                ok = a.stateReady && a.composeView.hasWindowFocus() && a.composeView.width > 0 &&
+                    keys.all { a.lumenState.bindingFor(it)?.diagnostics()?.backend == expected } &&
+                    a.lumenState.session.diagnostics().attachedSurfaces >= 4
+                if (!ok && a.stateReady) seen = keys.joinToString { key ->
+                    a.lumenState.bindingFor(key)?.diagnostics()?.let { "$key=${it.backend}/${it.failure}" } ?: "$key=unbound" }
+            }
+            if (!ok) SystemClock.sleep(25)
+        }
+        assertTrue("Native surfaces did not sample the Compose backdrop with $expected: $seen", ok)
     }
 
     private fun image(scenario: ActivityScenario<ComposeSandboxActivity>): Bitmap {
@@ -176,13 +205,28 @@ class NativeComposeIntegrationTest {
         }
     }
 
-    @Test fun aSurfaceInsideTheBackdropCannotFeedBackIntoItsOwnSource() {
+    @Test fun aSurfaceInsideTheBackdropCannotFeedBackIntoItsOwnSource() = backdropCannotFeedBack(software = false)
+
+    /** API 27 只有软件采样：在每个 API 上都把同一检查跑一遍软件后端。 */
+    @Test fun aSoftwareSampledSurfaceInsideTheBackdropCannotFeedBackIntoItsOwnSource() = backdropCannotFeedBack(software = true)
+
+    private fun backdropCannotFeedBack(software: Boolean) {
         ActivityScenario.launch(ComposeSandboxActivity::class.java).use { scenario ->
-            ready(scenario)
+            val expected = if (software) LumenSurfaceBackend.SOFTWARE
+                else if (Build.VERSION.SDK_INT >= 31) LumenSurfaceBackend.GPU else LumenSurfaceBackend.SOFTWARE
+            // 强制软件采样；按 1/4 分辨率采样，高分辨率设备（1440×3200）上也不超出沙盒的软件像素预算而退回静态。
+            // 本用例只看录制次数是否收敛，不比较像素。
+            if (software) scenario.onActivity {
+                it.surfaceOptions = it.surfaceOptions.copy(sampling = it.surfaceOptions.sampling.copy(
+                    backend = LumenSurfaceBackend.SOFTWARE, softwareScale = .25f))
+            }
+            ready(scenario, expected)
             scenario.onActivity { it.decorateBackdrop = true }
-            SystemClock.sleep(200)
-            ready(scenario)
+            ready(scenario, expected)
             scenario.onActivity { assertNull(it.lumenState.bindingFor("backdrop-surface")) }
+            // 装饰背景会让内容层整体重录一次（API 31 强制软件采样实测 12 → 23，此后 3 s 不再增加）。慢设备上这次重录
+            // 可能落进下面的计数窗口（2026-11-06 CI API 27：18 → 27），所以先等它收敛，再检查没有持续的自身反馈。
+            awaitStableRecordings(scenario)
             var recordings = 0L
             scenario.onActivity { recordings = it.lumenState.session.diagnostics().contentRecordings }
             SystemClock.sleep(300)
