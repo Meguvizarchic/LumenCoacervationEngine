@@ -22,7 +22,8 @@
 
 ```kotlin
 // build.gradle.kts：桥已经带上 meguviz-android-window 与 meguviz-android-lifecycle，版本由 BOM 对齐
-implementation("com.github.jichuo1.LumenCoacervationEngine:lumen-bridge-meguviz-android:1.6.2")
+// 1.6.2 尚未发布，桥坐标不是可解析的远程制品；在 Lumen 源码树内用 project() 依赖：
+implementation(project(":lumen-bridge-meguviz-android"))
 implementation(platform("io.github.jichuo1.meguviz:meguviz-bom:1.2.0"))
 
 // Activity.onCreate（Activity 须是 LifecycleOwner，例如 AppCompatActivity）
@@ -122,4 +123,5 @@ Meguviz 侧两座既有 Lumen 桥（在临时克隆里构建，不改原仓库�
 
 - 只在 API 33 真机与 API 34 模拟器上验证；未在 API 27–32 上运行本桥。
 - 本模块要等 Meguviz 1.2.0 上 Central 后才能进 CI 与发布；在此之前用上面的本地 BOM 1.2.0 候选联调，Lumen 侧坐标固定为 `1.6.2`。
-- **关闭顺序**：`openLumenSurfaces()` 交给 Activity 生命周期托管，不需要手写 `onDestroy()`；但这只适用于该入口。若直接使用 Meguviz 的 `UiScope`/`WindowSession`，必须按 UI 文档先关 binding、再关窗口会话（`docs/quickstart/03-lifecycle-and-close.md`、`docs/guides/bridges-android.md:93`），并显式 `surfaces.close()` 释放 Lumen 表面。两种入口不要混用。
+- **关闭顺序**：`openLumenSurfaces()` 交给 Activity 生命周期托管，不需要手写 `onDestroy()`；但这只适用于该入口。若直接使用 Meguviz 的 `UiScope`/`WindowSession`，必须按 MeguvizUI 文档先关 binding、再关窗口会话（`/Volumes/DevEnvironment/MeguvizUI/docs/quickstart/03-lifecycle-and-close.md` 与
+`/Volumes/DevEnvironment/MeguvizUI/docs/guides/bridges-android.md`），并显式 `surfaces.close()` 释放 Lumen 表面。两种入口不要混用。
