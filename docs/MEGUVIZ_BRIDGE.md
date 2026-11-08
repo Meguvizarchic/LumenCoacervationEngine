@@ -22,7 +22,7 @@
 
 ```kotlin
 // build.gradle.kts：桥已经带上 meguviz-android-window 与 meguviz-android-lifecycle，版本由 BOM 对齐
-implementation("com.github.jichuo1.LumenCoacervationEngine:lumen-bridge-meguviz-android:<版本>")
+implementation("com.github.jichuo1.LumenCoacervationEngine:lumen-bridge-meguviz-android:1.6.2")
 implementation(platform("io.github.jichuo1.meguviz:meguviz-bom:1.2.0"))
 
 // Activity.onCreate（Activity 须是 LifecycleOwner，例如 AppCompatActivity）
@@ -61,14 +61,22 @@ val surfaces = window.openLumenSurfaces()   // Java：LumenMeguvizWindow.openLum
 ## 构建
 
 Meguviz 1.2.0 上 Maven Central 之前，本模块和演示页默认不进构建（`settings.gradle.kts` 只在 `-Plumen.meguviz=true` 时 include）。
-CI、JitPack 与发布流水线都不受影响，本模块也不随 Lumen 发布。本地联调用 MeguvizFamily 生成 staging 解析脚本：
+CI、JitPack 与发布流水线都不受影响，本模块也不随 Lumen 发布。
+
+本地联调现在用**统一的 `meguviz-bom:1.2.0` 本地候选仓库**（未签名、未发布），不再使用带 `-joint` 后缀的版本：
 
 ```sh
-python D:/DevArea/MeguvizFamily/family.py init-script --only android --output <dir>/family-android.init.gradle.kts
-python D:/DevArea/MeguvizFamily/family.py bom --output <bom-repo>/io/github/jichuo1/meguviz/meguviz-bom/1.2.0/meguviz-bom-1.2.0.pom
-./gradlew -Plumen.meguviz=true -I <dir>/family-android.init.gradle.kts -I <解析 bom-repo 的 init 脚本> \
+# 生成/刷新本地候选与 BOM（字节来自各库自己的 publish 输出）
+python3 /Volumes/DevEnvironment/meguviz-joint/tools/publish_local_bom.py
+python3 /Volumes/DevEnvironment/meguviz-joint/tools/publish_local_bom.py --check
+
+./gradlew -Plumen.meguviz=true \
+    -I /Volumes/DevEnvironment/meguviz-joint/tools/meguviz-bom.init.gradle.kts \
     :sample:assembleRelease :sample:assembleReleaseAndroidTest
 ```
+
+`1.0.0` 是 Central 上已发布且不可变的版本，仍从 Central 解析；本地仓库只提供未发布的 `1.2.0`。
+若消费方启用了依赖校验，请为 1.2.0 候选**追加** pins，不要删改任何已有 SHA。
 
 开关打开时 sample 多一个桌面入口"Lumen × Meguviz"（`MeguvizBridgeActivity`，可滚动的条纹内容上四张玻璃卡片），以及设备测试
 `MeguvizBridgeTest`（生命周期与一行接入的契约）和 `MeguvizBridgeBenchmarkTest`（三种写法的实测对照）。
@@ -113,4 +121,5 @@ Meguviz 侧两座既有 Lumen 桥（在临时克隆里构建，不改原仓库�
 ## 未验证与限制
 
 - 只在 API 33 真机与 API 34 模拟器上验证；未在 API 27–32 上运行本桥。
-- 本模块要等 Meguviz 1.2.0 上 Central 后才能进 CI 与发布；坐标中的 `<版本>` 届时确定。
+- 本模块要等 Meguviz 1.2.0 上 Central 后才能进 CI 与发布；在此之前用上面的本地 BOM 1.2.0 候选联调，Lumen 侧坐标固定为 `1.6.2`。
+- **关闭顺序**：`openLumenSurfaces()` 交给 Activity 生命周期托管，不需要手写 `onDestroy()`；但这只适用于该入口。若直接使用 Meguviz 的 `UiScope`/`WindowSession`，必须按 UI 文档先关 binding、再关窗口会话（`docs/quickstart/03-lifecycle-and-close.md`、`docs/guides/bridges-android.md:93`），并显式 `surfaces.close()` 释放 Lumen 表面。两种入口不要混用。
