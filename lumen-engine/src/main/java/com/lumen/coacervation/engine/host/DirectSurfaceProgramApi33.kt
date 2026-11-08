@@ -2,6 +2,7 @@ package com.lumen.coacervation.engine.host
 
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.RuntimeShader
@@ -15,10 +16,18 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** Direct paint uniforms support continuous geometry/light without a new RenderEffect snapshot. */
+/**
+ * Direct paint uniforms support continuous geometry/light without a new RenderEffect snapshot.
+ *
+ * 程序在进程内只编译一次（[Shared]）：同一段 AGSL 每次 `RuntimeShader(String)` 都在主线程重新编译，此前每个直接着色绑定、
+ * 每次重绑各付一次。共享成立的前提：只在主线程使用；[draw] 在 `drawRect` 前写全 PROGRAM 声明的每一个 uniform 与三个输入
+ * （`DirectProgramSharingContractTest` 守住）；`Paint` 取原生实例时对当前 uniform 拍快照，已录制的绘制不受后续写入影响。
+ * 共享程序会留住最后一次绘制的输入着色器（API 34+ 在 Java 侧、API 33 在原生 builder 里），[close] 把输入换成透明占位，
+ * 关闭的绑定不再经由它留住采样位图。
+ */
 @RequiresApi(33)
 internal class DirectSurfaceProgramApi33(private val counters: LumenGraphicsCounters) : AutoCloseable {
-    private var shader: RuntimeShader? = RuntimeShader(PROGRAM).also {counters.shaderCompiled()}
+    private var shader: RuntimeShader? = acquire()
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
     private val radiiA=FloatArray(4);private val radiiB=FloatArray(4)
     private val ripple=FloatArray(4)
@@ -116,7 +125,30 @@ internal class DirectSurfaceProgramApi33(private val counters: LumenGraphicsCoun
         paint.shader=s;canvas.drawRect(bounds,paint)
         return true
     }
-    override fun close(){paint.shader=null;shader=null}
+    override fun close(){
+        paint.shader=null
+        val s=shader?:return
+        shader=null
+        val empty=Shared.empty as? Shader?:LinearGradient(0f,0f,1f,0f,Color.TRANSPARENT,Color.TRANSPARENT,Shader.TileMode.CLAMP).also {Shared.empty=it}
+        s.setInputShader("clearInput",empty);s.setInputShader("weakInput",empty);s.setInputShader("strongInput",empty)
+    }
+
+    /** [draw] 抛错后调用：丢弃共享程序，下一个绑定重新编译一份，与共享之前「每绑定一份」的失败隔离相同。 */
+    fun discard(){
+        val s=shader
+        if(s!=null&&Shared.program===s)Shared.program=null
+        paint.shader=null;shader=null
+    }
+
+    /** 进程级、仅主线程。字段用 Any，API 33 类型不出现在本隔离类以外的类里（ENGINEERING_RULES §2）。 */
+    private object Shared {
+        var program: Any?=null
+        var empty: Any?=null
+    }
+
+    /** 实例方法而非 companion：API 33 类型只出现在以 Api33 结尾的类里（`$Companion` 不算隔离类）。 */
+    private fun acquire(): RuntimeShader =
+        Shared.program as? RuntimeShader?:RuntimeShader(PROGRAM).also {Shared.program=it;counters.shaderCompiled()}
 }
 
 private const val PROGRAM="""

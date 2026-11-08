@@ -6,7 +6,7 @@
 
 ## 主要缺口（按收益排序）
 
-1. **`DirectSurfaceProgramApi33` 的 `RuntimeShader` 仍每绑定一份。**
+1. **`DirectSurfaceProgramApi33` 的 `RuntimeShader` 仍每绑定一份。**（2026-11-08 已落地：进程内共享，见 CHANGELOG 与 `docs/perf/2026-11-08-direct-program-sharing.txt`；第 2 项「直接着色预热」随之只剩每进程一次编译。）
    API 33+ 上每个增强表面首帧多付约 1.1–1.5 ms 的 AGSL 编译；三段透镜程序已经共享，直接着色路径
    应对齐同一策略（按参数键复用）。这是本轮识别出的最大单点收益。
 2. **直接着色路径没有预热。** 透镜共享那条路径有预热，直接着色没有；首次进入页面会集中出现编译尖峰。

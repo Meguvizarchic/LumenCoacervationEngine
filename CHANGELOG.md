@@ -15,6 +15,7 @@
 
 ### 性能
 
+- 局部增强的直接着色程序（API 33+ 的 DIRECT_BITMAP 路径，`DirectSurfaceProgramApi33`）在进程内只编译一次：此前每个增强绑定、每次重新绑定各编译一份 AGSL，集中在首帧主线程。`draw` 在 `drawRect` 前写全程序声明的 34 个 uniform 与 3 个输入，`Paint` 取原生实例时对 uniform 拍快照，共享与每绑定一份逐位一致；关闭绑定时把输入换成透明占位，共享程序不再经由输入着色器留住已关闭绑定的采样位图；绘制抛错时丢弃共享程序，下一个绑定重新编译，失败隔离与之前相同。`DirectProgramSharingTest`（8 个参数各不相同的增强表面，关闭后全部重绑一遍；API 35 模拟器 `-gpu host`，基线 2668706 与改动交替两批共 5 轮）：8 个表面的窗口像素哈希在 10 次运行与重绑后逐个相同；着色器构建（首绑/含重绑）8/16 → 1/1 或 0/0（0/0 时程序已由沙盒页编译）；绑定后最慢一帧绘制 4.5–19.6 ms → 0.59–3.43 ms，首批帧绘制合计 7.8–25.6 ms → 3.0–9.6 ms。模拟器数值，未经真机验证；原始输出 `docs/perf/2026-11-08-direct-program-sharing.txt`。JVM 契约 `DirectProgramSharingContractTest`。
 - Activity 级悬浮栏的内容节点玻璃（Liquid 与柔光）在进程内共用透镜程序：此前每挂一条栏（演示首页顶栏、底栏、浮动按钮共 3 条）、每次重建页面都重新编译一段 AGSL。透镜对象自己持有共享程序，悬浮栏与局部会话各一份（两类使用方参数不同，交替写同一份程序会让每次效果重建多写一遍光学 uniform），并记下每份程序上次写入的参数，没变就不重写；局部会话的效果重建因此也省掉了重复写入。`ChromeLensSharingBenchmarkTest`（3 条栏，Xiaomi 2210132C API 33，基线与改动交替各 3 轮）：每条栏的窗口像素哈希逐个相同；重新登记一条栏 Liquid 1.11–1.40 ms → 5–6 µs、柔光 159–177 µs → 7–10 µs。`ChromeLensRebuildBenchmarkInstrumentedTest`：参数不变时"先写参数再建效果"与只建效果持平（中位 139–153 µs 对 141–155 µs）。`LensProgramSharingTest` 的 8 个局部表面像素哈希不变。JVM 契约 `SharedLensProgramContractTest`。
 - 局部会话的 GPU 透镜程序（LIQUID、FROSTED、Prism 三段 AGSL）在进程内各只编译一次：此前每个绑定、每次重新绑定都重新编译（前台主线程单次约 1.1–1.5 ms，一页 8 个表面约 9 ms，集中在首帧）。每次建效果前写回本表面的强度与光学参数，RuntimeEffect 的 uniform 写时复制保证各效果保留自己的快照。`LensProgramSharingTest`（8 个表面、两种材质各两档强度，Xiaomi 2210132C API 33，基线与改动交替各 2×3 轮）：8 个表面的窗口像素哈希逐个相同；本会话着色器构建 8 → 1；绑定后首帧绘制 7.1–9.6 ms → 3.0–5.6 ms。JVM 契约 `SharedLensProgramContractTest`。
 

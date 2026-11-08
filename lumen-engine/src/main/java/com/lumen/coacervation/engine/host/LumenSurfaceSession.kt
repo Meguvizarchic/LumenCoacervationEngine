@@ -1402,7 +1402,7 @@ public class LumenSurfaceSession @JvmOverloads constructor(
                                             if(entry.appearance.sampling.blurEnabled)entry.materialRadiusBackdrop else entry.materialBackdrop,
                                             entry.materialFill,entry.materialEdge,entry.materialShadow,entry.materialBlur)
                                         if(enhancedPainted){entry.gpuPixels=execution;backend=LumenSurfaceBackend.GPU;gpuDraws++}
-                                    }catch(_:Throwable){entry.gpuFailed=true;entry.direct?.close();entry.direct=null;reason=LumenSurfaceFailure.GPU_FAILED}
+                                    }catch(_:Throwable){entry.gpuFailed=true;entry.direct?.discard();entry.direct=null;reason=LumenSurfaceFailure.GPU_FAILED}
                                 }
                                 if(!enhancedPainted){
                                     configureEnhancedPath(c,host)
