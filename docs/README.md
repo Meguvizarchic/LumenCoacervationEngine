@@ -21,6 +21,8 @@
 | [SURFACE_SESSIONS.md](SURFACE_SESSIONS.md) | 局部视效会话：来源、采样、位置与滚动通知 |
 | [VIEWPORT_CONTENT_SOURCE.md](VIEWPORT_CONTENT_SOURCE.md) | 小视口来源：区域并集、overlay 坐标、前景探针、反馈拒绝与关闭 |
 | [MEGUVIZ_BRIDGE.md](MEGUVIZ_BRIDGE.md) | 可选 Meguviz 桥（未发布）：为什么只有 MeguvizAndroid 一座、最小接入、本地 staging 构建、联调验证与 Meguviz 侧 Lumen 桥的兼容结果 |
+| [MATERIAL_OPACITY.md](MATERIAL_OPACITY.md) | 材质浓度：所有控件通用的透明度无极调节（自 1.5.6），含设计、实现取舍与模糊半径方案 |
+| [NATIVE_BACKDROP.md](NATIVE_BACKDROP.md) | 可选原生 backdrop（自 1.6.0）：API 37.2 上的开关、输入语义与适用范围 |
 | [VISUAL_EFFECTS.md](VISUAL_EFFECTS.md) | 局部增强：轮廓、按压、光源、渐进模糊、质量与平台回退 |
 | [P2_EFFECTS_AND_ASSETS.md](P2_EFFECTS_AND_ASSETS.md) | 传感器光源、程序化效果与粒子、Lottie / PAG / Rive 资产 |
 | [NATIVE_COMPOSE.md](NATIVE_COMPOSE.md) | 原生 Compose 接入原型与待验收项 |
@@ -46,6 +48,7 @@
 | [RELEASE_1.5.5_REVIEW.md](RELEASE_1.5.5_REVIEW.md) | 通用滑块的设计、各材质的实现取舍（Prism 镜片不采样背景）、真机复核与验证边界；多级手风琴首级标题形变修复 |
 | [RELEASE_1.5.4_REVIEW.md](RELEASE_1.5.4_REVIEW.md) | 性能报告复核、等价优化、刷新率自唤醒陷阱、二进制兼容与验证边界 |
 | [ASYNC_PREPARATION_REVIEW_2026_10_23.md](ASYNC_PREPARATION_REVIEW_2026_10_23.md) | 未发布异步 Mica 接口、源码契约索引、缓存正反验证与 API 37 定向设备记录 |
+| [PERFORMANCE_RESEARCH_2026_11_07.md](PERFORMANCE_RESEARCH_2026_11_07.md) | 2026-11-07 渲染性能调研记录（只是调研，不含代码改动；结论按来源标注已验证／理论／传闻） |
 | [RELEASE_1.5.2_REVIEW.md](RELEASE_1.5.2_REVIEW.md) | 屏幕圆角、自定义皮肤动画、异步预处理与门禁索引的发布审阅；替代前一阶段未发布状态 |
 | [RELEASE_1.5.3_REVIEW.md](RELEASE_1.5.3_REVIEW.md) | 长文本输入框描边、展开手风琴四向形变、当前页局部外溢及手势回归的发布审阅 |
 | [PORTABILITY_AUDIT.md](PORTABILITY_AUDIT.md) | 1.0.0 从来源工程抽离时的可移植性审查 |

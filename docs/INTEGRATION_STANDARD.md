@@ -24,20 +24,22 @@
 
 宿主**应当**按下面的优先级选一种方式接入：
 
-1. **Maven 坐标**。组是 `com.lumen.coacervation.engine`，产物有三个：
-   - `lumen-engine`：必需；
-   - `lumen-motion`：可选，长按弹性与打开/关闭/可打断动画；
-   - `lumen-controls`：可选。
+1. **Maven 坐标**。模块名相同、group 随渠道不同；版本取最新的 Release 或 `CHANGELOG.md`，所选模块**必须**使用同一个版本：
+   - JitPack：`com.github.jichuo1.LumenCoacervationEngine:<模块>:<版本>`，仓库 `maven("https://jitpack.io")`；
+   - Maven Central：`io.github.jichuo1:<模块>:<版本>`。不是每个版本都上 Central，以 Central 上实际存在的版本为准（发布流程见 `CENTRAL_PUBLISHING.md`）；
+   - 本地仓库：Release 附件 `lumen-maven-<版本>.zip` 解压后的目录，或在本工程运行 `publishAllPublicationsToProjectLocalRepository` 产出的 `build/repo`，group 为 `com.lumen.coacervation.engine`。宿主把这个目录，或任何私有仓库，加进 `repositories` 即可。
 
-   在本工程运行 `publishAllPublicationsToProjectLocalRepository`，会把两个产物发布到 `build/repo`。宿主把这个目录，或任何私有仓库，加进 `repositories` 即可：
+   模块见 §1.3，`lumen-engine` 必需，其余按需添加：
 
    ```kotlin
    dependencies {
-       implementation("com.lumen.coacervation.engine:lumen-engine:1.0.0")
-       implementation("com.lumen.coacervation.engine:lumen-motion:1.0.0")   // 可选
-       implementation("com.lumen.coacervation.engine:lumen-controls:1.0.0") // 可选
+       implementation("<group>:lumen-engine:<版本>")
+       implementation("<group>:lumen-motion:<版本>")   // 可选
+       implementation("<group>:lumen-controls:<版本>") // 可选
    }
    ```
+
+   `1.6.0` 与 `1.6.1` 的 AAR 元数据要求消费者用 compileSdk 37.2 编译（`checkAarMetadata`），1.6.2 起只要求 37，更早的版本也只要求 37（见 `CHANGELOG.md`）。
 
 2. **Gradle 复合构建**。在宿主的 `settings.gradle.kts` 里写 `includeBuild("../LumenCoacervationEngine")`，依赖写法与第 1 种相同，Gradle 会自动替换成源码工程。宿主的 AGP 版本**应当**与引擎一致；不一致时改用第 1 种。
 
@@ -63,6 +65,10 @@
 | `lumen-engine` | 必需 | AndroidX core | 两套材质、会话与状态机、悬浮栏可读性、回弹视口、触摸光晕、自定义背景 |
 | `lumen-motion` | 可选 | `lumen-engine` | 长按弹性与高光、可打断动画、弹窗与全屏页的打开和关闭、翻页与文字链、手风琴、定位高亮（§12、§13） |
 | `lumen-controls` | 可选 | + AppCompat、RecyclerView | 把 `SwitchCompat`、`CheckBox`、`EditText` 换装成引擎材质；翻页器的 `SwitchCompat` 识别；拖拽排序 |
+| `lumen-compose` | 可选原型 | `lumen-engine`、`lumen-motion`、Compose | 原生局部材质、背景来源、Lazy 生命周期与长按弹性，见 `NATIVE_COMPOSE.md` |
+| `lumen-effects` | 可选 | `lumen-motion` | 薄膜、纸张、有限能量与粒子装饰，见 `P2_EFFECTS_AND_ASSETS.md` |
+| `lumen-assets` | 可选 | `lumen-motion` | 动画资产来源、播放会话与生命周期管理 |
+| `lumen-assets-lottie` / `lumen-assets-pag` / `lumen-assets-rive` | 可选 | `lumen-assets` + 对应播放库 | Lottie JSON、PAG 时间线、Rive 画板与状态机输入 |
 | `sample` | 参考 | — | 按本标准写的最小接入示例 |
 
 ## 2. Activity 接入

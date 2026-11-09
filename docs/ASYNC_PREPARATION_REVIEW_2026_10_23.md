@@ -6,7 +6,7 @@
 
 ## 实现与资源归属
 
-新增 `LumenMicaPreparer`、`LumenMicaImageSource`、`LumenMicaPreparationListener` 和类型化失败枚举。线程、所有权和接入样例见 [API](API.md#20-可选云母与内容分层host自-145) 与 [Mica 接入](MICA_MATERIAL.md#31-可选异步预处理未发布)。
+新增 `LumenMicaPreparer`、`LumenMicaImageSource`、`LumenMicaPreparationListener` 和类型化失败枚举。线程、所有权和接入样例见 [API](API.md#20-可选云母与内容分层host自-145) 与 [Mica 接入](MICA_MATERIAL.md#31-可选异步预处理自-152)。
 
 - 一个 preparer 最多一个执行中操作、一个最新待处理来源和一个最新未交付结果；输入获取和结果通知都合并，主线程繁忙时不积压位图。
 - 来源是惰性工厂；成功返回后转移独占软件 Bitmap 的所有权。预处理在 finally 中回收输入；工厂抛错前自行负责已获取的资源。同步 `LumenMicaImage.prepare()` 的借用语义保持原样。

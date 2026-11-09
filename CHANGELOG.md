@@ -8,75 +8,63 @@
 
 - 可选桥 `lumen-bridge-meguviz-android`（未发布，默认不进构建，`docs/MEGUVIZ_BRIDGE.md`）：Activity 上一行接入 `openLumenSurfaces()`（自动打开只读窗口会话并交给生命周期；重复调用返回同一会话，参数冲突、非主线程、Activity 已销毁或不是 LifecycleOwner 时直接报错；默认配色跟随深浅色），已有窗口会话的宿主用 `WindowSession.openLumenSurfaces()`；会话随窗口会话关闭，不另登记 Activity 回调；版本由 `platform(meguviz-bom)` 对齐。Meguviz 1.2.0 上 Maven Central 之前只在 `-Plumen.meguviz=true` 的本地构建里存在，CI、JitPack 与不用 Meguviz 的宿主不受影响。Sample 同时多一个演示页 `MeguvizBridgeActivity` 与设备测试 `MeguvizBridgeTest`、`MeguvizBridgeBenchmarkTest`：只用 Lumen、各自管理、桥接三种写法在 Xiaomi 2210132C 上的卡片窗口像素逐个相同（含退到后台再回来），首帧、滚动帧 p50/p90、静止与后台唤醒、PSS、接入分配与冷启动没有可分辨的差别。
 
-### 修复
-
-- 库的 AAR 元数据不再要求消费者用 compileSdk 37.2 编译：本仓库为原生 backdrop 用 37.2 编译，AGP 默认把 `compileSdkMinor` 写进 AAR 元数据，1.6.0 与 1.6.1 因此迫使每个消费者也用 37.2（`checkAarMetadata` 失败）。原生 backdrop 只在内部隔离类里使用、按完整版本门控，公开签名不含 37.2 类型，现在显式只要求 37。证据：Meguviz 的 `meguviz-drawable-lumen` 与 `meguviz-ui-lumen-bridge`（compileSdk 37.0）在 1.6.1 上编译失败，改动后编译通过，前者设备契约 45/45 与探针观测和 1.5.5 逐行相同（`docs/MEGUVIZ_BRIDGE.md`）。JVM 契约 `ConsumerCompileSdkContractTest`。
-- 实时取样 Liquid 页面关闭后可能被热状态监听留住：PowerManager 把监听包成 Binder 存根交给系统进程，注销后存根要等系统进程 GC 才释放，此前登记出去的监听经监视器 → 性能协调器 → 渲染器一路捕获到 Activity。现在登记的是只经一个可清空引用回到监视器的中转对象，停止时清空。证据：Demo APK（7e1c3b6）API 31 的 `LifecycleLeakDiagnosticTest` 等满 10 秒后仍有 4 个 `SliderSandboxActivity` 存活，导出的 hprof 引用链为 `PowerManager$3`（JNI 全局引用）→ `LiquidThermalMonitorApi29` → `LiquidPerformanceController` → `LiquidActivityRenderer` → Activity。新增 `ThermalListenerReleaseInstrumentedTest`：停止后继续持有登记出去的监听（模拟远端尚未释放），回调链必须可回收；改动前在 API 34 模拟器与 Xiaomi 2210132C 上失败，改动后通过。
-
-### 性能
-
-- 局部增强的直接着色程序（API 33+ 的 DIRECT_BITMAP 路径，`DirectSurfaceProgramApi33`）在进程内只编译一次：此前每个增强绑定、每次重新绑定各编译一份 AGSL，集中在首帧主线程。`draw` 在 `drawRect` 前写全程序声明的 34 个 uniform 与 3 个输入，`Paint` 取原生实例时对 uniform 拍快照，共享与每绑定一份逐位一致；关闭绑定时把输入换成透明占位，共享程序不再经由输入着色器留住已关闭绑定的采样位图；绘制抛错时丢弃共享程序，下一个绑定重新编译，失败隔离与之前相同。`DirectProgramSharingTest`（8 个参数各不相同的增强表面，关闭后全部重绑一遍；API 35 模拟器 `-gpu host`，基线 2668706 与改动交替两批共 5 轮）：8 个表面的窗口像素哈希在 10 次运行与重绑后逐个相同；着色器构建（首绑/含重绑）8/16 → 1/1 或 0/0（0/0 时程序已由沙盒页编译）；绑定后最慢一帧绘制 4.5–19.6 ms → 0.59–3.43 ms，首批帧绘制合计 7.8–25.6 ms → 3.0–9.6 ms。模拟器数值，未经真机验证；原始输出 `docs/perf/2026-11-08-direct-program-sharing.txt`。JVM 契约 `DirectProgramSharingContractTest`。
-- Activity 级悬浮栏的内容节点玻璃（Liquid 与柔光）在进程内共用透镜程序：此前每挂一条栏（演示首页顶栏、底栏、浮动按钮共 3 条）、每次重建页面都重新编译一段 AGSL。透镜对象自己持有共享程序，悬浮栏与局部会话各一份（两类使用方参数不同，交替写同一份程序会让每次效果重建多写一遍光学 uniform），并记下每份程序上次写入的参数，没变就不重写；局部会话的效果重建因此也省掉了重复写入。`ChromeLensSharingBenchmarkTest`（3 条栏，Xiaomi 2210132C API 33，基线与改动交替各 3 轮）：每条栏的窗口像素哈希逐个相同；重新登记一条栏 Liquid 1.11–1.40 ms → 5–6 µs、柔光 159–177 µs → 7–10 µs。`ChromeLensRebuildBenchmarkInstrumentedTest`：参数不变时"先写参数再建效果"与只建效果持平（中位 139–153 µs 对 141–155 µs）。`LensProgramSharingTest` 的 8 个局部表面像素哈希不变。JVM 契约 `SharedLensProgramContractTest`。
-- 局部会话的 GPU 透镜程序（LIQUID、FROSTED、Prism 三段 AGSL）在进程内各只编译一次：此前每个绑定、每次重新绑定都重新编译（前台主线程单次约 1.1–1.5 ms，一页 8 个表面约 9 ms，集中在首帧）。每次建效果前写回本表面的强度与光学参数，RuntimeEffect 的 uniform 写时复制保证各效果保留自己的快照。`LensProgramSharingTest`（8 个表面、两种材质各两档强度，Xiaomi 2210132C API 33，基线与改动交替各 2×3 轮）：8 个表面的窗口像素哈希逐个相同；本会话着色器构建 8 → 1；绑定后首帧绘制 7.1–9.6 ms → 3.0–5.6 ms。JVM 契约 `SharedLensProgramContractTest`。
-
-### 测试
-
-- 两个时序敏感的设备用例改为确定性等待（2026-11-06 Demo APK 42218019773 各失败一次，提交只改了图标资源）。`ExpandedAccordionHeaderTest` 的按住拖动先等被按控件真正进入原生按下状态再发 MOVE：滚动容器里的按下状态由 tapTimeout 后的一条主线程消息设置，主线程卡顿时它会排在 MOVE 之后，引擎按设计不接管尚未确认收到事件流的控件（本地 DOWN 后卡住主线程 400 ms：原写法 5/5 失败，新写法 5/5 通过）。`NativeComposeIntegrationTest` 装饰背景后先等录制次数连续 10 个 vsync 不变再计数：装饰会让内容层一次性重录（API 31 强制软件采样实测 12 → 23，此后 3 s 不变，没有自身反馈或持续录制），慢设备上这次重录曾落进计数窗口；另加同一检查的强制软件采样版本，在每个 API 上覆盖 API 27 走的软件路径。断言不变，没有重试或跳过。
-- `LifecycleLeakDiagnosticTest`：9 个演示页各开关 8 次（共 72 个实例），GC 后全部可回收，内存压力中心的登记数不随开关次数增长（只有 3 个进程级缓存）。判定前按弱引用轮询回收最多 10 秒（系统滚动条淡出消息会在页面关闭后约 1 秒内持有 Activity）；超时仍存活时导出 `lumen-leak.hprof`，Demo APK 的 smoke 失败时随测试报告上传，用于离线查引用链。
-
-### 性能
-
-- 软件透镜采样批次的主线程分配：`collectJobs` 复用两张临时列表、批次拆分改用复用的数组成本（`LensBatchSplit.secondHalf(groups, LongArray, processors)`，结果与列表版本相同）、逐表面准备去掉 `Result` 包装。`SamplerBatchAllocationBenchmarkTest`（4 个软件后端表面、内容逐帧变化，Xiaomi 2210132C API 33，基线与改动交替各 2 轮）：每次采样请求主线程分配 2,754–2,756 B → 2,658–2,662 B（含测试夹具与 View 遍历本身的分配），像素回归不变。
-- 滚动通知不再重算「源与目标都在同一滚动容器内」的相对采样矩阵：`notifyScrollPositionChanged` 在源随容器移动、目标也在该容器内、且该表面已成功登记过几何时，跳过整条祖先链重算与随后的 `failure()` 复查（`ScrollSamplingGeometry` 新增只读 `isInitialized`，未登记过几何的表面仍走原路径）。容器滚动对两者施加同一平移，相对矩阵数学上不变；旧口径的逐位比较在大平移下可能有浮点抵消噪声，跳过同时避免了该噪声。只对 `installsBackground` 的条目跳过——这类条目的 target 就是 host View，视图链关系成立；自定义 target 的 `coordinateView` 按接口契约只标识窗口，真实几何不一定跟随它。调用方必须传「实际发生滚动」的那个 View，传它的祖先会漏掉真正的滚动容器。`docs/SURFACE_SESSIONS.md` 的位置通知协议本就如此要求。宿主探针 `ScrollRelativeMatrixSkipProbeTest`（纯 JVM，复用真实 `SamplingMatrixMath`/`ScrollSamplingGeometry`/`ScrollSurfaceScope`，50 轮）：16 卡每次通知的重算 16 → 0 次、耗时 1.456 ms → 0（50 轮合计 800 → 0 次）；4 卡每次通知 4 → 0 次、70.3 µs → 0（合计 200 → 0 次）；新旧口径对每个表面的结论逐条一致。新增 `ScrollRelativeMatrixSkipContractTest`。未跑真机桥基准。
-
-### 新增
-
 - `LumenSurfacePresets.card(radiusDp, material)`：卡片角色采样表面的起点，与手写选项逐字段相等（`SurfaceCardPresetTest`）；Sample 材质浓度沙盒的四块玻璃改用它，`MaterialOpacityRegressionTest` 的逐像素断言照常通过。
+
 - 设备基准 `BindingCallBenchmarkTest`：满载会话（16 个表面）里绑定逐帧调用的主线程耗时，供后续优化对照。曾尝试的按 id 单槽 / 下标缓存在交替访问与设置光源上比线性查找更慢，未并入。
 
-### 新增
-
 - `LumenSurfaceSession.forActivity(activity, palette, options)`：一行创建随 Activity 销毁自动关闭的局部会话，配色默认取当前深浅色的 `LumenPalette.neutral`。关闭发生在 `super.onDestroy()` 内，宿主在 onDestroy 里先关依赖控件的顺序不变；弱持有 Activity，关闭时注销回调。原构造与行为不变。Sample 的 Fluent / 材质浓度 / Prism 沙盒改用它并删去手动 close。
+
 - `LumenSurfaceOptions.withTint(opacity)`：同时设置 `tintOpacity` 与 `fallbackTintOpacity`（宿主常把两者写成同一个值）。
+
 - 设备用例 `SurfaceShortcutsTest`（登记为 smoke 必测）：`forActivity`（默认配色）+ `withTint` 与显式构造 + 两参数 copy 的窗口像素逐位相同；Activity 销毁后会话关闭、背景还原、回调注销。
 
-### 性能
+- `LumenSurfaceSession.ensure(view, surface, source)` / `ensureSource(view, surface, source, enhancements)`：幂等绑定。宿主刷新主题或状态时每个表面调用一次：已绑定、来源相同且背景仍归引擎时就地 `update`（选项相同即空操作）并交回同一绑定，否则重新绑定并包裹宿主的新背景。取代宿主手写的“isBound + 背景归属 + padding 保存 + update/重绑”对账（BIL 六处同形）。设备用例 `SurfaceEnsureTest`（登记为 smoke 必测），JVM 契约 `SurfaceEnsureContractTest`。
 
-- 实时透镜的行列映射表按表面缓存（`LensRemapTables`）：几何与强度不变时（静止、匀速滚动的同一表面）不再每个作业分配三张列表、也不再逐行逐列求 `lens()`；输出与改写前逐位相同（`BitExactKernelsTest` 600 组几何序列覆盖命中、扩容、缩小与改强度）。底栏典型尺寸 2000 次重映射：分配 4,161,536 B → 0；API 34 模拟器 p50 77–84µs → 59–63µs，p90 229–262µs → 97–133µs（`LensRemapTablesBenchmarkInstrumentedTest`）。
-- 柔光渲染器的实时透镜缓冲有了总字节预算 `ModernMaterialPolicy.LIVE_SAMPLE_BYTES`（8 MiB，可容纳 17 个最坏尺寸表面，与局部会话默认值相同）；此前没有总量上限。超出时新表面退回静态磨砂。
+- `LumenViewportContentSource(owner, surface, paddingPx = 8f)`：固定表面集合、无内缩时的简写构造（另有 `LumenContentSource` 版本），与 regions 写法逐项等价；空表面或非法余量立即抛 `IllegalArgumentException`。设备用例 `ViewportContentSourceTest.surfaceListConstructorMatchesTheRegionsForm` 核对裁剪边界、代理尺寸、版本签名与录制像素相同。该用例与 1.6.1 之后新增的 `InputOutlineScrollTest.standalonePublicOutlineKeepsItsPlaceAtSignedScrollOffsets` 一并登记为 smoke 必测项（`verify-smoke-results.py`）。
+
+- `LumenControlOutline.create(context, accentColor, radiusDp, emphasized = false)` 与 `LumenViewportForeground.wrap(drawable)`：不经 `LumenActivityDelegate` 的控件描边与视口前景包装。宿主自有基类与配色此前只能复制 `controlOutline` 与内部的 `ViewportForegroundDrawable`（BIL PR #41 即为此复制了一份）；`LumenActivityDelegate.controlOutline` 现委托给同一实现，像素不变。设备用例 `InputOutlineScrollTest.standalonePublicOutlineKeepsItsPlaceAtSignedScrollOffsets`，JVM 契约 `ControlOutlineContractTest`。
 
 ### 变更
 
 - 进程级内存压力自动接管：引擎第一次拿到 Context（`LumenActivityDelegate.prepare()`、`LumenSurfaceSession`、`LumenMicaBackdrop`）时在 Application 上登记一次系统回调，`TRIM_MEMORY_RUNNING_CRITICAL`、`>= TRIM_MEMORY_COMPLETE` 与 onLowMemory 自动调用 `LumenEngine.releaseGraphics()`。宿主不再需要在 `Application.onTrimMemory` 里转发（INTEGRATION_STANDARD §3.3 放宽，已有转发仍有效）；控件阴影纹理、宿主 `LumenPreparedBackdropCache`、Mica 图像与进程级已准备底图此前只在宿主转发时才随系统 trim 释放。Sample 删除了手动转发。
 
+### 修复
+
+- 库的 AAR 元数据不再要求消费者用 compileSdk 37.2 编译：本仓库为原生 backdrop 用 37.2 编译，AGP 默认把 `compileSdkMinor` 写进 AAR 元数据，1.6.0 与 1.6.1 因此迫使每个消费者也用 37.2（`checkAarMetadata` 失败）。原生 backdrop 只在内部隔离类里使用、按完整版本门控，公开签名不含 37.2 类型，现在显式只要求 37。证据：Meguviz 的 `meguviz-drawable-lumen` 与 `meguviz-ui-lumen-bridge`（compileSdk 37.0）在 1.6.1 上编译失败，改动后编译通过，前者设备契约 45/45 与探针观测和 1.5.5 逐行相同（`docs/MEGUVIZ_BRIDGE.md`）。JVM 契约 `ConsumerCompileSdkContractTest`。
+
+- 实时取样 Liquid 页面关闭后可能被热状态监听留住：PowerManager 把监听包成 Binder 存根交给系统进程，注销后存根要等系统进程 GC 才释放，此前登记出去的监听经监视器 → 性能协调器 → 渲染器一路捕获到 Activity。现在登记的是只经一个可清空引用回到监视器的中转对象，停止时清空。证据：Demo APK（7e1c3b6）API 31 的 `LifecycleLeakDiagnosticTest` 等满 10 秒后仍有 4 个 `SliderSandboxActivity` 存活，导出的 hprof 引用链为 `PowerManager$3`（JNI 全局引用）→ `LiquidThermalMonitorApi29` → `LiquidPerformanceController` → `LiquidActivityRenderer` → Activity。新增 `ThermalListenerReleaseInstrumentedTest`：停止后继续持有登记出去的监听（模拟远端尚未释放），回调链必须可回收；改动前在 API 34 模拟器与 Xiaomi 2210132C 上失败，改动后通过。
+
 ### 性能
+
+- 局部增强的直接着色程序（API 33+ 的 DIRECT_BITMAP 路径，`DirectSurfaceProgramApi33`）在进程内只编译一次：此前每个增强绑定、每次重新绑定各编译一份 AGSL，集中在首帧主线程。`draw` 在 `drawRect` 前写全程序声明的 34 个 uniform 与 3 个输入，`Paint` 取原生实例时对 uniform 拍快照，共享与每绑定一份逐位一致；关闭绑定时把输入换成透明占位，共享程序不再经由输入着色器留住已关闭绑定的采样位图；绘制抛错时丢弃共享程序，下一个绑定重新编译，失败隔离与之前相同。`DirectProgramSharingTest`（8 个参数各不相同的增强表面，关闭后全部重绑一遍；API 35 模拟器 `-gpu host`，基线 2668706 与改动交替两批共 5 轮）：8 个表面的窗口像素哈希在 10 次运行与重绑后逐个相同；着色器构建（首绑/含重绑）8/16 → 1/1 或 0/0（0/0 时程序已由沙盒页编译）；绑定后最慢一帧绘制 4.5–19.6 ms → 0.59–3.43 ms，首批帧绘制合计 7.8–25.6 ms → 3.0–9.6 ms。模拟器数值，未经真机验证；原始输出 `docs/perf/2026-11-08-direct-program-sharing.txt`。JVM 契约 `DirectProgramSharingContractTest`。
+
+- Activity 级悬浮栏的内容节点玻璃（Liquid 与柔光）在进程内共用透镜程序：此前每挂一条栏（演示首页顶栏、底栏、浮动按钮共 3 条）、每次重建页面都重新编译一段 AGSL。透镜对象自己持有共享程序，悬浮栏与局部会话各一份（两类使用方参数不同，交替写同一份程序会让每次效果重建多写一遍光学 uniform），并记下每份程序上次写入的参数，没变就不重写；局部会话的效果重建因此也省掉了重复写入。`ChromeLensSharingBenchmarkTest`（3 条栏，Xiaomi 2210132C API 33，基线与改动交替各 3 轮）：每条栏的窗口像素哈希逐个相同；重新登记一条栏 Liquid 1.11–1.40 ms → 5–6 µs、柔光 159–177 µs → 7–10 µs。`ChromeLensRebuildBenchmarkInstrumentedTest`：参数不变时"先写参数再建效果"与只建效果持平（中位 139–153 µs 对 141–155 µs）。`LensProgramSharingTest` 的 8 个局部表面像素哈希不变。JVM 契约 `SharedLensProgramContractTest`。
+
+- 局部会话的 GPU 透镜程序（LIQUID、FROSTED、Prism 三段 AGSL）在进程内各只编译一次：此前每个绑定、每次重新绑定都重新编译（前台主线程单次约 1.1–1.5 ms，一页 8 个表面约 9 ms，集中在首帧）。每次建效果前写回本表面的强度与光学参数，RuntimeEffect 的 uniform 写时复制保证各效果保留自己的快照。`LensProgramSharingTest`（8 个表面、两种材质各两档强度，Xiaomi 2210132C API 33，基线与改动交替各 2×3 轮）：8 个表面的窗口像素哈希逐个相同；本会话着色器构建 8 → 1；绑定后首帧绘制 7.1–9.6 ms → 3.0–5.6 ms。JVM 契约 `SharedLensProgramContractTest`。
+
+- 软件透镜采样批次的主线程分配：`collectJobs` 复用两张临时列表、批次拆分改用复用的数组成本（`LensBatchSplit.secondHalf(groups, LongArray, processors)`，结果与列表版本相同）、逐表面准备去掉 `Result` 包装。`SamplerBatchAllocationBenchmarkTest`（4 个软件后端表面、内容逐帧变化，Xiaomi 2210132C API 33，基线与改动交替各 2 轮）：每次采样请求主线程分配 2,754–2,756 B → 2,658–2,662 B（含测试夹具与 View 遍历本身的分配），像素回归不变。
+
+- 滚动通知不再重算「源与目标都在同一滚动容器内」的相对采样矩阵：`notifyScrollPositionChanged` 在源随容器移动、目标也在该容器内、且该表面已成功登记过几何时，跳过整条祖先链重算与随后的 `failure()` 复查（`ScrollSamplingGeometry` 新增只读 `isInitialized`，未登记过几何的表面仍走原路径）。容器滚动对两者施加同一平移，相对矩阵数学上不变；旧口径的逐位比较在大平移下可能有浮点抵消噪声，跳过同时避免了该噪声。只对 `installsBackground` 的条目跳过——这类条目的 target 就是 host View，视图链关系成立；自定义 target 的 `coordinateView` 按接口契约只标识窗口，真实几何不一定跟随它。调用方必须传「实际发生滚动」的那个 View，传它的祖先会漏掉真正的滚动容器。`docs/SURFACE_SESSIONS.md` 的位置通知协议本就如此要求。宿主探针 `ScrollRelativeMatrixSkipProbeTest`（纯 JVM，复用真实 `SamplingMatrixMath`/`ScrollSamplingGeometry`/`ScrollSurfaceScope`，50 轮）：16 卡每次通知的重算 16 → 0 次、耗时 1.456 ms → 0（50 轮合计 800 → 0 次）；4 卡每次通知 4 → 0 次、70.3 µs → 0（合计 200 → 0 次）；新旧口径对每个表面的结论逐条一致。新增 `ScrollRelativeMatrixSkipContractTest`。未跑真机桥基准。
+
+- 实时透镜的行列映射表按表面缓存（`LensRemapTables`）：几何与强度不变时（静止、匀速滚动的同一表面）不再每个作业分配三张列表、也不再逐行逐列求 `lens()`；输出与改写前逐位相同（`BitExactKernelsTest` 600 组几何序列覆盖命中、扩容、缩小与改强度）。底栏典型尺寸 2000 次重映射：分配 4,161,536 B → 0；API 34 模拟器 p50 77–84µs → 59–63µs，p90 229–262µs → 97–133µs（`LensRemapTablesBenchmarkInstrumentedTest`）。
+
+- 柔光渲染器的实时透镜缓冲有了总字节预算 `ModernMaterialPolicy.LIVE_SAMPLE_BYTES`（8 MiB，可容纳 17 个最坏尺寸表面，与局部会话默认值相同）；此前没有总量上限。超出时新表面退回静态磨砂。
 
 - 高级材质实时档的自定义背景不再生成光学副本：实时档折射与根绘制读清晰底图，副本从不绘制，此前仍在后台做一次 CPU 软化、分配同尺寸位图并上传纹理。每张自定义背景少一张位图（至多 2 MiB 堆 + 等量 GPU），进程级已准备底图缓存（4 MiB）可多容纳一条。设备用例 `LiquidCustomBackdropMemoryInstrumentedTest` 核对折射输入与底图逐位相同。
+
 - 高级材质实时档的 Activity 退到后台时只留正在显示的那一块实时截图，交还另外两块轮转缓冲、探测原图、抑制底图与区域比较池（默认 100 万像素预算下约 16 MB／Activity，返回栈越深收益越大）；回到前台补齐缓冲、保留绑定，玻璃不会在首次截图前闪回稳定底图。交还的缓冲只断引用、不回收（三缓冲轮转约束），不走会永久降级的挂起或 TRANSLUCENT 路径。设备用例 `LiquidPerformanceLifecycleRegressionTest.stoppingKeepsOnlyTheDisplayedCaptureAndReturningRegrowsWithoutRebinding`（热状态 4 的夹具：5,037,120 B → 1,679,040 B → 回前台 5,037,120 B），JVM 契约 `LiquidStopEvictionContractTest`。
-
-### 新增
-
-- `LumenSurfaceSession.ensure(view, surface, source)` / `ensureSource(view, surface, source, enhancements)`：幂等绑定。宿主刷新主题或状态时每个表面调用一次：已绑定、来源相同且背景仍归引擎时就地 `update`（选项相同即空操作）并交回同一绑定，否则重新绑定并包裹宿主的新背景。取代宿主手写的“isBound + 背景归属 + padding 保存 + update/重绑”对账（BIL 六处同形）。设备用例 `SurfaceEnsureTest`（登记为 smoke 必测），JVM 契约 `SurfaceEnsureContractTest`。
-
-### 性能
 
 - 每个绑定条目缓存唯一的 `LumenSurfaceBinding` 句柄，`bind`/`bindSource`/`bindTarget`/draw-only 绑定与 `ensure` 不再每次分配；`update` 与 `ensure` 共用同一条就地更新路径。8 个表面的对账（Xiaomi 2210132C API 33，5 轮）：宿主手写 p50 7.4–10.7µs / p90 8.8–12.6µs，`ensure` p50 7.1–9.3µs / p90 7.3–9.5µs，且宿主侧不再需要两张 HashMap 与重绑时的 padding 数组。
 
-### 新增
-
-- `LumenViewportContentSource(owner, surface, paddingPx = 8f)`：固定表面集合、无内缩时的简写构造（另有 `LumenContentSource` 版本），与 regions 写法逐项等价；空表面或非法余量立即抛 `IllegalArgumentException`。设备用例 `ViewportContentSourceTest.surfaceListConstructorMatchesTheRegionsForm` 核对裁剪边界、代理尺寸、版本签名与录制像素相同。该用例与 1.6.1 之后新增的 `InputOutlineScrollTest.standalonePublicOutlineKeepsItsPlaceAtSignedScrollOffsets` 一并登记为 smoke 必测项（`verify-smoke-results.py`）。
-
-### 性能
-
 - `LumenViewportContentSource.contentVersion` 遍历时，子 View 的全局矩阵直接由父 View 刚算出的全局矩阵乘以自身 step 求得（与祖先备忘同一公式和运算次序，逐位一致），省去逐 View 的 IdentityHashMap 查找/写入与数组拷贝。`ViewportVersionBenchmarkTest`（241 个 View，Xiaomi 2210132C API 33，前后各 5 轮）：p50 111–133µs → 71–88µs。
 
-### 新增
-
-- `LumenControlOutline.create(context, accentColor, radiusDp, emphasized = false)` 与 `LumenViewportForeground.wrap(drawable)`：不经 `LumenActivityDelegate` 的控件描边与视口前景包装。宿主自有基类与配色此前只能复制 `controlOutline` 与内部的 `ViewportForegroundDrawable`（BIL PR #41 即为此复制了一份）；`LumenActivityDelegate.controlOutline` 现委托给同一实现，像素不变。设备用例 `InputOutlineScrollTest.standalonePublicOutlineKeepsItsPlaceAtSignedScrollOffsets`，JVM 契约 `ControlOutlineContractTest`。
-
-### 性能
-
 - `LumenViewportContentSource.contentVersion`：每次会话 pre-draw 遍历可见子树时，目标逆矩阵每次快照只求一次，逐 View 不再经 `Matrix.setValues` / `mapRect` / `getValues` 三次 JNI，可见性裁剪改用与 `SkMatrix::mapRect` 同分支的纯 Kotlin 包围盒（`SamplingMatrixMath.mapBounds`，透视矩阵仍交给 Skia）。签名值逐位不变。设备基准 `ViewportVersionBenchmarkTest`（241 个 View、表面覆盖整个来源，400 次读取，同一设备前后 APK 各 3 轮）：Xiaomi 2210132C（API 33）单次读取 p50 212–223µs → 109–130µs，p90 231–278µs → 125–147µs。
+
+### 测试
+
+- 两个时序敏感的设备用例改为确定性等待（2026-11-06 Demo APK 42218019773 各失败一次，提交只改了图标资源）。`ExpandedAccordionHeaderTest` 的按住拖动先等被按控件真正进入原生按下状态再发 MOVE：滚动容器里的按下状态由 tapTimeout 后的一条主线程消息设置，主线程卡顿时它会排在 MOVE 之后，引擎按设计不接管尚未确认收到事件流的控件（本地 DOWN 后卡住主线程 400 ms：原写法 5/5 失败，新写法 5/5 通过）。`NativeComposeIntegrationTest` 装饰背景后先等录制次数连续 10 个 vsync 不变再计数：装饰会让内容层一次性重录（API 31 强制软件采样实测 12 → 23，此后 3 s 不变，没有自身反馈或持续录制），慢设备上这次重录曾落进计数窗口；另加同一检查的强制软件采样版本，在每个 API 上覆盖 API 27 走的软件路径。断言不变，没有重试或跳过。
+
+- `LifecycleLeakDiagnosticTest`：9 个演示页各开关 8 次（共 72 个实例），GC 后全部可回收，内存压力中心的登记数不随开关次数增长（只有 3 个进程级缓存）。判定前按弱引用轮询回收最多 10 秒（系统滚动条淡出消息会在页面关闭后约 1 秒内持有 Activity）；超时仍存活时导出 `lumen-leak.hprof`，Demo APK 的 smoke 失败时随测试报告上传，用于离线查引用链。
 
 ### 构建
 

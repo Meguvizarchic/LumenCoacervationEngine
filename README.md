@@ -171,7 +171,7 @@ dependencies {
 }
 ```
 
-复合构建与本地 Maven 接入见[适配标准 §1.1](docs/INTEGRATION_STANDARD.md#11-依赖方式)。
+Maven Central 上也有同名模块：`io.github.jichuo1:lumen-engine:<版本>`（目前 Central 上只有 `1.6.1`，且 `1.6.0`/`1.6.1` 的 AAR 元数据要求消费者用 compileSdk 37.2 编译，`1.6.2` 起只要求 37）。复合构建与本地 Maven 接入见[适配标准 §1.1](docs/INTEGRATION_STANDARD.md#11-依赖方式)。
 
 **2. 连接 Activity 生命周期**
 
