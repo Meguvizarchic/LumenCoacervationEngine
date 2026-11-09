@@ -51,6 +51,8 @@
 - `internal` 声明、未列入 `API.md` 的公开辅助成员、源码契约测试，都不在承诺范围内。
 - 视觉调参（颜色、模糊半径、光学强度）属于修订：同一宿主在修订版本之间的画面允许有细微差异，但不得出现结构性变化，例如表面缺失、层级错乱。
 
+1.6.2 新增公开 API：`LumenSurfaceSession.forActivity`、`ensure` / `ensureSource`、`LumenSurfacePresets.card`、`LumenSurfaceOptions.withTint`、`LumenViewportContentSource` 的简写构造、`LumenControlOutline.create` 与视口前景入口（逐条见 `CHANGELOG.md` 和 `API.md` 里标注“未发布”的条目），并包含进程内共享着色程序、软件透镜批次、滚动矩阵等性能优化、热状态监听泄漏修复，以及库 AAR 元数据不再要求消费者用 compileSdk 37.2 编译的修复。新增公开 API 按上表属于次版本，本次按用户明确指定保持 1.6.2，作为编号例外；与 1.6.1 的公开 API 对比（2026-11-09，`javap -public`）没有删除或改变任何声明，只有新增，`GlowEngine`、`SkinId` 与持久化协议、契约版本 1、minSdk 27 保持兼容。可选桥 `lumen-bridge-meguviz-android` 默认不进构建，不随这个版本发布。
+
 1.6.1 为修订：只修复演示 Sample 的 `SurfaceSandboxActivity` 启动方式（原生 backdrop 演示改为仅由演示入口显式开启，直接启动恢复静止页面）并新增设备测试 `SurfaceSandboxLaunchModeTest`；九个库模块（`lumen-*`）的源码与 1.6.0 相同，公开 API、契约版本 1、`SkinId` 与持久化协议、minSdk 27 与 1.6.0 一致。1.6.0 的 tag 不可移动，且该版发布时没有走库附件与演示包流水线，所以修复以 1.6.1 发出。
 
 1.6.0 为次版本：新增可选、默认关闭的原生 backdrop 开关（`LumenSurfaceBinding.setRenderTargetBackdropEnabled`、`renderTargetBackdropState`，仅在 API 37.2 且表面满足条件时生效），并包含预绘制内根来源 `contentVersion` 只读一次的性能优化。既有公开入口、`GlowEngine`、`SkinId` 与持久化协议、契约版本 1、minSdk 27 保持兼容；未开启开关时与 1.5.6 行为一致。本次未与 1.5.6 发布 AAR 重新做逐类描述符比对，发布前应补做。

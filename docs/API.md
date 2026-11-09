@@ -339,7 +339,7 @@ view.foreground = LumenViewportForeground.wrap(myFocusRing)
 - LumenSurfaceListener.onSurfaceState(id, backend, failure, firstVisibleDraw)：异步合并、异常隔离。
 - LumenSurfacePresets.floating / fadingBand / staticPanel：可继续copy调节的配置。
 
-### 可选原生 backdrop（未发布）
+### 可选原生 backdrop（自 1.6.0）
 
 | 声明 | 说明 |
 |---|---|
