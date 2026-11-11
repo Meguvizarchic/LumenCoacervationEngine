@@ -14,7 +14,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 
-REPO = "jichuo1/LumenCoacervationEngine"
+REPO = "Meguvizarchic/LumenCoacervationEngine"
 MODULES = (
     "lumen-engine", "lumen-motion", "lumen-controls", "lumen-compose", "lumen-effects",
     "lumen-assets", "lumen-assets-lottie", "lumen-assets-pag", "lumen-assets-rive",
