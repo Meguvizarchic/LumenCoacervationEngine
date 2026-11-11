@@ -8,6 +8,8 @@
 
 - 可选桥 `lumen-bridge-meguviz-android`（未发布，默认不进构建，`docs/MEGUVIZ_BRIDGE.md`）：Activity 上一行接入 `openLumenSurfaces()`（自动打开只读窗口会话并交给生命周期；重复调用返回同一会话，参数冲突、非主线程、Activity 已销毁或不是 LifecycleOwner 时直接报错；默认配色跟随深浅色），已有窗口会话的宿主用 `WindowSession.openLumenSurfaces()`；会话随窗口会话关闭，不另登记 Activity 回调；版本由 `platform(meguviz-bom)` 对齐。Meguviz 1.2.0 上 Maven Central 之前只在 `-Plumen.meguviz=true` 的本地构建里存在，CI、JitPack 与不用 Meguviz 的宿主不受影响。Sample 同时多一个演示页 `MeguvizBridgeActivity` 与设备测试 `MeguvizBridgeTest`、`MeguvizBridgeBenchmarkTest`：只用 Lumen、各自管理、桥接三种写法在 Xiaomi 2210132C 上的卡片窗口像素逐个相同（含退到后台再回来），首帧、滚动帧 p50/p90、静止与后台唤醒、PSS、接入分配与冷启动没有可分辨的差别。
 
+- `LumenSurfacePresets.floating` 补上 `@JvmOverloads`：Java 可以写无参的 `LumenSurfacePresets.floating()`，与 `fadingBand()`、`card()`、`staticPanel()` 一致（此前 Java 只能写 `floating(LumenSurfaceMaterial.FROSTED)`，而 `docs/SURFACE_SESSIONS.md` 的第一个示例用的正是无参形式）。只新增一个静态重载，Kotlin 调用点与已有签名不变；JVM 契约 `SurfaceCardPresetTest.everyPresetHasAZeroArgumentStaticFormForJava` 用反射核对四个预设的无参静态方法存在且结果与 Kotlin 默认调用逐字段相等。
+
 - `LumenSurfacePresets.card(radiusDp, material)`：卡片角色采样表面的起点，与手写选项逐字段相等（`SurfaceCardPresetTest`）；Sample 材质浓度沙盒的四块玻璃改用它，`MaterialOpacityRegressionTest` 的逐像素断言照常通过。
 
 - 设备基准 `BindingCallBenchmarkTest`：满载会话（16 个表面）里绑定逐帧调用的主线程耗时，供后续优化对照。曾尝试的按 id 单槽 / 下标缓存在交替访问与设置光源上比线性查找更慢，未并入。

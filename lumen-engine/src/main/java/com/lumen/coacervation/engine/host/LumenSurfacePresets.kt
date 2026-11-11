@@ -4,7 +4,9 @@ import com.lumen.coacervation.engine.model.SurfaceRole
 
 /** Starting points, not persisted choices. Every field can still be changed with copy(). */
 public object LumenSurfacePresets {
-    @JvmStatic public fun floating(material: LumenSurfaceMaterial = LumenSurfaceMaterial.FROSTED): LumenSurfaceOptions =
+    /** `@JvmOverloads`（未发布）：Java 也能写无参的 `LumenSurfacePresets.floating()`，与 `fadingBand()` / `card()` 一致。 */
+    @JvmStatic @JvmOverloads
+    public fun floating(material: LumenSurfaceMaterial = LumenSurfaceMaterial.FROSTED): LumenSurfaceOptions =
         LumenSurfaceOptions(material = material)
 
     @JvmStatic @JvmOverloads

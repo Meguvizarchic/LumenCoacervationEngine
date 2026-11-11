@@ -337,7 +337,7 @@ view.foreground = LumenViewportForeground.wrap(myFocusRing)
 - LumenSurfaceMaterial / LumenSurfaceBackend / LumenSurfaceFadeDirection / LumenSurfaceFailure：公开枚举。
 - LumenSurfaceState / LumenSurfaceDiagnostics：请求/实际材质、每绑定状态及会话计数。
 - LumenSurfaceListener.onSurfaceState(id, backend, failure, firstVisibleDraw)：异步合并、异常隔离。
-- LumenSurfacePresets.floating / fadingBand / staticPanel：可继续copy调节的配置。
+- LumenSurfacePresets.floating / fadingBand / staticPanel：可继续copy调节的配置。四个预设（含 `card`）的全默认形式都能从 Java 写成无参静态调用；`floating()` 的无参形式未发布（此前只有 `floating(LumenSurfaceMaterial)`）。
 
 ### 可选原生 backdrop（自 1.6.0）
 
