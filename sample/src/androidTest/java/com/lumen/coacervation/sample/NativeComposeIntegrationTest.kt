@@ -342,7 +342,9 @@ class NativeComposeIntegrationTest {
     fun nativeEnhancedPressChangesPixelsAndUniformUpdatesKeepTheShaderCache() {
         ActivityScenario.launch(ComposeSandboxActivity::class.java).use { scenario ->
             ready(scenario)
+            var gpuDrawsBeforeEnhancements = 0L
             scenario.onActivity { a ->
+                gpuDrawsBeforeEnhancements = a.lumenState.session.diagnostics().gpuDraws
                 a.enhancements = LumenSurfaceEnhancements(
                     geometry = LumenSurfaceGeometryOptions(cornersEnabled = true,
                         corners = LumenSurfaceCorners(28f, 4f, 18f, 8f)),
@@ -350,10 +352,14 @@ class NativeComposeIntegrationTest {
                         radiusFraction = .18f, highlightStrength = 0f),
                     light = LumenSurfaceLightOptions(enabled = true, intensity = .4f))
             }
-            await(scenario, "Native enhanced surfaces did not create their direct shader inputs") { a ->
-                a.lumenState.session.performanceDiagnostics().runtimeShaderBuilds >= 3 &&
+            // An earlier surface may already have compiled the process-wide direct program.
+            await(scenario, "Native enhanced surfaces did not draw on the GPU") { a ->
+                a.lumenState.session.diagnostics().gpuDraws > gpuDrawsBeforeEnhancements &&
                     listOf(ComposeSandboxActivity.CARD, ComposeSandboxActivity.INPUT, ComposeSandboxActivity.SELECTION)
-                        .all { a.lumenState.bindingFor(it)?.diagnostics()?.backend == LumenSurfaceBackend.GPU }
+                        .all { key ->
+                            val state = a.lumenState.bindingFor(key)?.diagnostics()
+                            state != null && state.backend == LumenSurfaceBackend.GPU && state.hasVisibleFrame
+                        }
             }
             SystemClock.sleep(150)
             val card = bounds(scenario, ComposeSandboxActivity.CARD)
