@@ -32,7 +32,7 @@
 | `fun selectMaterial(context, material, realtimeCapture: Boolean? = null): Boolean` | 切换材质；true 时宿主 `recreate()` | §3.2 |
 | `fun isRealtimeCaptureEnabled(context): Boolean` | 全屏实时取样开关 | §3.2 |
 | `fun setRealtimeCaptureEnabled(context, enabled): Boolean` | 写入开关；需重建 Activity 生效 | §3.2 |
-| `fun releaseGraphics()` | 进程级内存告急（trim 15 / ≥80）时释放图形资源。未发布：引擎首次创建会话时已在 Application 上自动登记同门槛的系统回调，宿主无需转发，仍可由自己的内存协调器调用 | §3.3 |
+| `fun releaseGraphics()` | 进程级内存告急（trim 15 / ≥80）时释放图形资源。自 1.6.2 起，引擎首次创建会话时已在 Application 上自动登记同门槛的系统回调，宿主无需转发，仍可由自己的内存协调器调用 | §3.3 |
 
 ### `LumenEngineConfig`（data class）
 
@@ -71,7 +71,7 @@
 | 诊断 | `val isLiquidRequested`、`val isLiquidEffective`、`val backendName: String?`、`fun diagnostics(): SkinSessionDiagnostics?` | §3.2 |
 | 生命周期 | `onStart()`、`onStop()`、`onTrimMemory(level)`、`onLowMemory()`、`onDestroy()` | §2.1 |
 
-### 独立控件描边与视口前景（未发布）
+### 独立控件描边与视口前景（自 1.6.2）
 
 宿主使用自己的 Activity 基类或配色、不经 `LumenActivityDelegate` 时，用这两个入口代替复制引擎代码。`controlOutline()` 现在就是对 `LumenControlOutline.create` 的委托，两者像素相同。
 
@@ -318,26 +318,26 @@ view.foreground = LumenViewportForeground.wrap(myFocusRing)
 | `LumenReorderCallback.directionsFor(layoutManager)`、`liftScale(longSidePx, density)`、`dropSettleDurationMs(px)` | 自动方向、按尺寸封顶的拾起放大、按距离的落位时长 | §14.5 |
 
 
-## 13. 局部视效会话（host，自1.1.0）
+## 13. 局部视效会话（host，自 1.1.0）
 
 规范与完整参数范围见 [SURFACE_SESSIONS.md](SURFACE_SESSIONS.md)。入口均为主线程。
 
-- LumenSurfaceSession(context, palette, options)：不接管根/窗口/输入、不读写偏好的AutoCloseable会话。
-- `LumenSurfaceSession.forActivity(activity, palette = LumenPalette.neutral(Activity 当前深浅色), options = LumenSurfaceSessionOptions())`（`@JvmStatic @JvmOverloads`，未发布）：同一构造，另在 Activity 销毁时自动 close（发生在 `super.onDestroy()` 内，晚于宿主 onDestroy 里关闭依赖控件的代码）；弱持有 Activity，close 时注销回调；已销毁的 Activity 返回已关闭的会话。手动 close 照常可用。
-- `LumenSurfacePresets.card(radiusDp = 16f, material = FROSTED)`（`@JvmStatic @JvmOverloads`，未发布）：卡片角色的采样表面，等价于 `LumenSurfaceOptions(material = material, role = SurfaceRole.CARD, radiusDp = radiusDp)`，与 `floating()` / `fadingBand()` / `staticPanel()` 同为可 `copy()` 的起点。
-- `LumenSurfaceOptions.withTint(opacity)`（未发布）：`copy(tintOpacity = opacity, fallbackTintOpacity = opacity)` 的简写，结果逐字段相等。
-- bind(view, surface, source: View?) / bindSource(view, surface, source: LumenContentSource?)：可逆背景绑定。
-- `ensure(view, surface = LumenSurfaceOptions(), source: View? = null)` / `ensureSource(view, surface, source: LumenContentSource?, enhancements = DEFAULT)`（`@JvmOverloads`，未发布）：幂等绑定。已绑定、来源相同（分组规则同 bindSource）且背景仍归引擎时就地 update 并返回同一绑定；否则重新绑定。每个绑定条目只有一个 `LumenSurfaceBinding` 实例。
-- setListener / updatePalette / updateOptions / notifyContentChanged / notifyPositionChanged / `notifyScrollPositionChanged(scrollHost: View)`。
-- pause / resume / releaseGraphics / diagnostics / close；关闭后入口无副作用。
-- LumenSurfaceBinding：id / update / diagnostics / close；旧绑定不能关闭新绑定。
-- LumenContentSource：coordinateView / excludesSurfaces / drawContent(Canvas)。Session 的 GPU 与软件录制均裁剪到 `coordinateView` 的局部 `[0,width) × [0,height)`；需要额外采样余量的自定义来源应声明足够大的视口，不能依赖画出该范围的内容。
-- LumenSurfaceOptions / LumenSurfaceSampling / LumenSurfaceSessionOptions：不可变配置，所有字段受范围约束。
-- `LumenSurfaceSampling.fadeCurve`：`LumenSurfaceFadeCurve.SMOOTH`（默认，保持原平滑曲线）或 `LINEAR`（hold 到 end 之间等速衰减）。方向、端点及透明尾部规则相同；GPU、软件采样和静态承托使用同一曲线。不改变未显式选择 LINEAR 的表面。
-- LumenSurfaceMaterial / LumenSurfaceBackend / LumenSurfaceFadeDirection / LumenSurfaceFailure：公开枚举。
-- LumenSurfaceState / LumenSurfaceDiagnostics：请求/实际材质、每绑定状态及会话计数。
-- LumenSurfaceListener.onSurfaceState(id, backend, failure, firstVisibleDraw)：异步合并、异常隔离。
-- LumenSurfacePresets.floating / fadingBand / staticPanel：可继续copy调节的配置。四个预设（含 `card`）的全默认形式都能从 Java 写成无参静态调用；`floating()` 的无参形式未发布（此前只有 `floating(LumenSurfaceMaterial)`）。
+- `LumenSurfaceSession(context, palette, options)`：不接管根/窗口/输入、不读写偏好的 AutoCloseable 会话。
+- `LumenSurfaceSession.forActivity(activity, palette = LumenPalette.neutral(Activity 当前深浅色), options = LumenSurfaceSessionOptions())`（`@JvmStatic @JvmOverloads`，自 1.6.2）：同一构造，另在 Activity 销毁时自动 close（发生在 `super.onDestroy()` 内，晚于宿主 `onDestroy` 里关闭依赖控件的代码）；弱持有 Activity，close 时注销回调；已销毁的 Activity 返回已关闭的会话。手动 close 照常可用。
+- `LumenSurfacePresets.card(radiusDp = 16f, material = FROSTED)`（`@JvmStatic @JvmOverloads`，自 1.6.2）：卡片角色的采样表面，等价于 `LumenSurfaceOptions(material = material, role = SurfaceRole.CARD, radiusDp = radiusDp)`，与 `floating()` / `fadingBand()` / `staticPanel()` 同为可 `copy()` 的起点。
+- `LumenSurfaceOptions.withTint(opacity)`（自 1.6.2）：`copy(tintOpacity = opacity, fallbackTintOpacity = opacity)` 的简写，结果逐字段相等。
+- `bind(view, surface, source: View?)` / `bindSource(view, surface, source: LumenContentSource?)`：可逆背景绑定。
+- `ensure(view, surface = LumenSurfaceOptions(), source: View? = null)` / `ensureSource(view, surface, source: LumenContentSource?, enhancements = DEFAULT)`（`@JvmOverloads`，自 1.6.2）：幂等绑定。已绑定、来源相同（分组规则同 `bindSource`）且背景仍归引擎时就地 `update` 并返回同一绑定；否则重新绑定。每个绑定条目只有一个 `LumenSurfaceBinding` 实例。
+- `setListener` / `updatePalette` / `updateOptions` / `notifyContentChanged` / `notifyPositionChanged` / `notifyScrollPositionChanged(scrollHost: View)`。
+- `pause` / `resume` / `releaseGraphics` / `diagnostics` / `close`；关闭后入口无副作用。
+- `LumenSurfaceBinding`：`id` / `update` / `diagnostics` / `close`；旧绑定不能关闭新绑定。
+- `LumenContentSource`：`coordinateView` / `excludesSurfaces` / `drawContent(Canvas)`。Session 的 GPU 与软件录制均裁剪到 `coordinateView` 的局部 `[0, width) × [0, height)`；需要额外采样余量的自定义来源应声明足够大的视口，不能依赖画出该范围的内容。
+- `LumenSurfaceOptions` / `LumenSurfaceSampling` / `LumenSurfaceSessionOptions`：不可变配置，所有字段受范围约束。
+- `LumenSurfaceSampling.fadeCurve`：`LumenSurfaceFadeCurve.SMOOTH`（默认，保持原平滑曲线）或 `LINEAR`（hold 到 end 之间等速衰减）。方向、端点及透明尾部规则相同；GPU、软件采样和静态承托使用同一曲线。不改变未显式选择 `LINEAR` 的表面。
+- `LumenSurfaceMaterial` / `LumenSurfaceBackend` / `LumenSurfaceFadeDirection` / `LumenSurfaceFailure`：公开枚举。
+- `LumenSurfaceState` / `LumenSurfaceDiagnostics`：请求/实际材质、每绑定状态及会话计数。
+- `LumenSurfaceListener.onSurfaceState(id, backend, failure, firstVisibleDraw)`：异步合并、异常隔离。
+- `LumenSurfacePresets.floating` / `fadingBand` / `staticPanel`：可继续 `copy` 调节的配置。四个预设（含 `card`）的全默认形式都能从 Java 写成无参静态调用；`floating()` 的无参形式自 1.6.2 起提供（此前只有 `floating(LumenSurfaceMaterial)`）。
 
 ### 可选原生 backdrop（自 1.6.0）
 
@@ -349,69 +349,69 @@ view.foreground = LumenViewportForeground.wrap(myFocusRing)
 
 仅 `bind(view, surface, source: View?)` 的基础圆角 FROSTED 背景满足条件时启用；自定义来源、draw-only target、复合 Acrylic/Mica/Liquid/Prism、折射、渐隐、增强效果或非完整的透明度/材质权重保留既有采样。软件画布、完整系统版本不足 `3700002`、变换/图层不匹配及后端失败同样回退。既有 `GPU` 诊断同时包含两种 GPU 实现，区分当前路径需读取上述 `active`。完整条件、生命周期、可复制示例和验证边界见 [NATIVE_BACKDROP.md](NATIVE_BACKDROP.md)。
 
-## 14. 局部增强（自1.2.0）
+## 14. 局部增强（自 1.2.0）
 
-完整默认值、有效范围、优先级与平台回退见 [VISUAL_EFFECTS.md](VISUAL_EFFECTS.md)。以下配置为不可变data class，构造/copy均校验范围；值类型与JSON编解码不依赖渲染线程，其余渲染/交互入口为主线程。
+完整默认值、有效范围、优先级与平台回退见 [VISUAL_EFFECTS.md](VISUAL_EFFECTS.md)。以下配置为不可变 data class，构造/copy 均校验范围；值类型与 JSON 编解码不依赖渲染线程，其余渲染/交互入口为主线程。
 
 | 声明 | 公开成员 |
 |---|---|
-| `host.LumenSurfaceSession` | 新重载`bind(view,surface,source: View?,enhancements)` / `bindSource(view,surface,source: LumenContentSource?,enhancements)`；`performanceDiagnostics(): LumenSurfacePerformance` |
-| `LumenSurfaceBinding` | `isBound`、`updateEnhancements`、`samplingRegions`、`setPressPixels(x,y,pressure)`、`setShapesPixels(ax,ay,aw,ah,bx,by,bw,bh,secondShape)`、`clearCustomShapes()`、`setLightDirection(x,y,z)`、`setFrameTimeNanos(now,manual)`、`emitRipplePixels(x,y)`、`clearTransientEffects()`、`setQualityPressure(pressure)` |
-| `LumenSurfaceEnhancements` | geometry/progressiveBlur/press/light/material/quality/debug；`DEFAULT` |
-| `LumenSurfaceCorners` | topLeft/topRight/bottomRight/bottomLeft；`mirrored()` |
-| `LumenSurfaceGeometryOptions` | cornersEnabled/corners/mirrorCornersInRtl/fusionEnabled/fusionRadiusDp/antiAliasWidthDp/shadowEnabled/shadowRadiusDp/shadowOpacity |
-| `LumenProgressiveBlurOptions` | enabled/weakRadiusDp/strongRadiusDp/weakStart/weakEnd/strongStart/strongEnd/direction/strength/maxBandHeightDp |
-| `LumenLocalPressOptions` | enabled/displacementDp/radiusFraction/highlightStrength/cancelOutside/releaseDurationMs/rippleEnabled/rippleAmplitudeDp/rippleSpeedDpPerSecond/rippleWidthDp/rippleLifetimeMs/maxRipples |
-| `LumenSurfaceLightOptions` | enabled/angleDegrees/altitude/intensity/specularStrength/specularPower/edgeWidthDp/transformNormals/gestureInfluence/smoothingTimeMs |
-| `LumenMaterialRecipeOptions` | intent/normalizeBySize/maxEdgeFraction/maxRefractionFraction/contrastFloor/reduceTransparency/reduceMotion/chromaticStrength/saturation/useIntentDefaults |
-| `LumenSurfaceQualityOptions` | enabled/mode/adaptive/lowerThreshold/upperThreshold/hysteresis/minimumDwellMs/maxExecutionPixels/maxBitmapPixels/bitmapIntervalMs |
-| `LumenSurfaceDebugOptions` | countersEnabled/timingEnabled/drawSamplingBounds/boundsLineWidthDp/boundsOpacity/samplingRange |
+| `host.LumenSurfaceSession` | 新重载 `bind(view, surface, source: View?, enhancements)` / `bindSource(view, surface, source: LumenContentSource?, enhancements)`；`performanceDiagnostics(): LumenSurfacePerformance` |
+| `LumenSurfaceBinding` | `isBound`、`updateEnhancements`、`samplingRegions`、`setPressPixels(x, y, pressure)`、`setShapesPixels(ax, ay, aw, ah, bx, by, bw, bh, secondShape)`、`clearCustomShapes()`、`setLightDirection(x, y, z)`、`setFrameTimeNanos(now, manual)`、`emitRipplePixels(x, y)`、`clearTransientEffects()`、`setQualityPressure(pressure)` |
+| `LumenSurfaceEnhancements` | geometry / progressiveBlur / press / light / material / quality / debug；`DEFAULT` |
+| `LumenSurfaceCorners` | topLeft / topRight / bottomRight / bottomLeft；`mirrored()` |
+| `LumenSurfaceGeometryOptions` | cornersEnabled / corners / mirrorCornersInRtl / fusionEnabled / fusionRadiusDp / antiAliasWidthDp / shadowEnabled / shadowRadiusDp / shadowOpacity |
+| `LumenProgressiveBlurOptions` | enabled / weakRadiusDp / strongRadiusDp / weakStart / weakEnd / strongStart / strongEnd / direction / strength / maxBandHeightDp |
+| `LumenLocalPressOptions` | enabled / displacementDp / radiusFraction / highlightStrength / cancelOutside / releaseDurationMs / rippleEnabled / rippleAmplitudeDp / rippleSpeedDpPerSecond / rippleWidthDp / rippleLifetimeMs / maxRipples |
+| `LumenSurfaceLightOptions` | enabled / angleDegrees / altitude / intensity / specularStrength / specularPower / edgeWidthDp / transformNormals / gestureInfluence / smoothingTimeMs |
+| `LumenMaterialRecipeOptions` | intent / normalizeBySize / maxEdgeFraction / maxRefractionFraction / contrastFloor / reduceTransparency / reduceMotion / chromaticStrength / saturation / useIntentDefaults |
+| `LumenSurfaceQualityOptions` | enabled / mode / adaptive / lowerThreshold / upperThreshold / hysteresis / minimumDwellMs / maxExecutionPixels / maxBitmapPixels / bitmapIntervalMs |
+| `LumenSurfaceDebugOptions` | countersEnabled / timingEnabled / drawSamplingBounds / boundsLineWidthDp / boundsOpacity / samplingRange |
 | `LumenMaterialIntent` | UNCHANGED / READING / CLEAR / OPAQUE_ACCESSIBLE / DECORATIVE |
 | `LumenDetailMode`、`LumenSamplingRangeMode` | LOW / BALANCED / HIGH；SAFE_INTERIOR / PADDED_EXPERIMENTAL |
-| `LumenVersionedContentSource : LumenContentSource` | sourceEpoch/contentVersion/availability/dependencies；getter为纯主线程快照，依赖默认空 |
+| `LumenVersionedContentSource : LumenContentSource` | sourceEpoch / contentVersion / availability / dependencies；getter 为纯主线程快照，依赖默认空 |
 | `LumenSourceAvailability` | READY / TEMPORARILY_UNAVAILABLE / PROHIBITED / INDEPENDENT_SURFACE |
-| `LumenSurfacePerformance` | contentRecordings/proxyRecordings/effectChainBuilds/runtimeShaderBuilds/softwareRequests/softwareCompletions/staleCompletions/contentRecordingNanos/softwareProcessingNanos/activeSoftwareBytes/logicalGpuContentPixels/logicalGpuEffectPixels/timingEnabled |
-| `LumenSurfaceSamplingRegions` | shapeBounds/requiredSampleBounds/recordedBounds/materializedBounds/outputClip/sourceId/sourceEpoch/contentVersion/capturedVersion/estimatedSourceAgeNanos/availability |
-| `LumenSurfaceRegion`、`LumenRegionSpace` | left/top/right/bottom/space；SOURCE_LOCAL / TARGET_LOCAL / EXECUTION_PIXELS |
-| `LumenEffectPreset(surface,enhancements,seed)` | `toJson(): String`；companion `fromJson(text): LumenEffectPreset`，schema1，最大16384字符，无图片或路径 |
-| `motion.LumenFrameClock` | `fun nowNanos(): Long`，非负单调时钟；固定回放可显式seek |
+| `LumenSurfacePerformance` | contentRecordings / proxyRecordings / effectChainBuilds / runtimeShaderBuilds / softwareRequests / softwareCompletions / staleCompletions / contentRecordingNanos / softwareProcessingNanos / activeSoftwareBytes / logicalGpuContentPixels / logicalGpuEffectPixels / timingEnabled |
+| `LumenSurfaceSamplingRegions` | shapeBounds / requiredSampleBounds / recordedBounds / materializedBounds / outputClip / sourceId / sourceEpoch / contentVersion / capturedVersion / estimatedSourceAgeNanos / availability |
+| `LumenSurfaceRegion`、`LumenRegionSpace` | left / top / right / bottom / space；SOURCE_LOCAL / TARGET_LOCAL / EXECUTION_PIXELS |
+| `LumenEffectPreset(surface, enhancements, seed)` | `toJson(): String`；companion `fromJson(text): LumenEffectPreset`，schema 1，最大 16384 字符，无图片或路径 |
+| `motion.LumenFrameClock` | `fun nowNanos(): Long`，非负单调时钟；固定回放可显式 seek |
 | `motion.LumenFixedFrameClock` | initialNanos；`nowNanos()` / `seekNanos(nanos)` / `advanceMillis(millis)` |
-| `interaction.LumenSurfaceInteraction(view,binding,press,light,clock)` | `update(press,light,reduceMotion)` / `observeTouch(event)` / `advanceFrame()` / `cancel()` / `pause()` / `resume()` / `close()`；不消费事件、不替换宿主监听 |
-| `widget.LumenSlidingSelection` | `setOnGeometryListener` / `getOnGeometryListener`；`OnGeometryListener.onGeometry(left,top,right,bottom,targetLeft,targetTop,targetRight,targetBottom,moving)`，原始类型参数 |
-| `widget.LumenFusedSelection(selection,palette,surface,enhancements,sharedNodeBaseline=false)` | `update(surface,enhancements)` / `setSharedNodeBaseline(enabled)` / `updatePalette` / `diagnostics` / `pause` / `resume` / `close`；可逆装饰真实选择器 |
+| `interaction.LumenSurfaceInteraction(view, binding, press, light, clock)` | `update(press, light, reduceMotion)` / `observeTouch(event)` / `advanceFrame()` / `cancel()` / `pause()` / `resume()` / `close()`；不消费事件、不替换宿主监听 |
+| `widget.LumenSlidingSelection` | `setOnGeometryListener` / `getOnGeometryListener`；`OnGeometryListener.onGeometry(left, top, right, bottom, targetLeft, targetTop, targetRight, targetBottom, moving)`，原始类型参数 |
+| `widget.LumenFusedSelection(selection, palette, surface, enhancements, sharedNodeBaseline = false)` | `update(surface, enhancements)` / `setSharedNodeBaseline(enabled)` / `updatePalette` / `diagnostics` / `pause` / `resume` / `close()`；可逆装饰真实选择器 |
 
-新类型的包名除明确标注motion/interaction/widget外均为`com.lumen.coacervation.engine.host`。
+新类型的包名除明确标注 `motion` / `interaction` / `widget` 外，均为 `com.lumen.coacervation.engine.host`。
 
 
-## 15. 可选传感器光源（自1.2.1，lumen-motion）
+## 15. 可选传感器光源（自 1.2.1，lumen-motion）
 
-包`com.lumen.coacervation.engine.sensor`。参数全部字段、默认及范围见[P2配置](P2_EFFECTS_AND_ASSETS.md)。
+包 `com.lumen.coacervation.engine.sensor`。参数全部字段、默认及范围见 [P2 配置](P2_EFFECTS_AND_ASSETS.md)。
 
-- `LumenSensorLightOptions`及全部构造字段、`LumenSensorLightState`、`LumenSensorLightDiagnostics(state,sensorType,events,updates,rejected,registrations)`。
-- `LumenLightVectorListener.onLight(x,y,z)`；`LumenGravityListener.onGravity(x,y,z,timestampNanos)`；`LumenGravityInput.sensorType/start(rateHz,allowAccelerometerFallback,listener)/stop()`。可注入输入须在主线程回调。
-- `LumenSensorLightController(view,listener,options=LumenSensorLightOptions(),input=null)`：`start/stop/update/diagnostics/close`。回调只输出向量，宿主选择接入的binding。
+- `LumenSensorLightOptions` 及全部构造字段、`LumenSensorLightState`、`LumenSensorLightDiagnostics(state, sensorType, events, updates, rejected, registrations)`。
+- `LumenLightVectorListener.onLight(x, y, z)`；`LumenGravityListener.onGravity(x, y, z, timestampNanos)`；`LumenGravityInput.sensorType/start(rateHz, allowAccelerometerFallback, listener)/stop()`。可注入输入须在主线程回调。
+- `LumenSensorLightController(view, listener, options = LumenSensorLightOptions(), input = null)`：`start/stop/update/diagnostics/close`。回调只输出向量，宿主选择接入的 binding。
 
-## 16. 独立生成器及粒子（自1.2.1，lumen-effects）
+## 16. 独立生成器及粒子（自 1.2.1，lumen-effects）
 
-包`com.lumen.coacervation.engine.effects`。`LumenEffectOptions`、`LumenProceduralOptions`、`LumenFilmOptions`、`LumenPaperOptions`、`LumenEnergyOptions`、`LumenParticleOptions`全部构造字段受兼容承诺；参数清单与范围见[P2配置](P2_EFFECTS_AND_ASSETS.md)。
+包 `com.lumen.coacervation.engine.effects`。`LumenEffectOptions`、`LumenProceduralOptions`、`LumenFilmOptions`、`LumenPaperOptions`、`LumenEnergyOptions`、`LumenParticleOptions` 全部构造字段受兼容承诺；参数清单与范围见 [P2 配置](P2_EFFECTS_AND_ASSETS.md)。
 
-- `LumenProceduralKind { FILM,PAPER,ENERGY }`、`LumenParticleShape { ORB,STREAK }`、`LumenEffectState`和`LumenEffectDiagnostics`全部字段。
-- `LumenEffectLayer(view,options=LumenEffectOptions(),clock=system)`：`update(value)`、`emitBurst(x,y):Int`、`triggerEnergy()`、`pause/resume/clear/advanceFrame/diagnostics/close`。x/y为宿主View内像素，关闭后调用为空操作。
-- `LumenEffectPreset(options=LumenEffectOptions())`：`toJson():String`、`fromJson(text):LumenEffectPreset`，schema固定为1。导出只含参数，不含任意执行代码。
+- `LumenProceduralKind { FILM, PAPER, ENERGY }`、`LumenParticleShape { ORB, STREAK }`、`LumenEffectState` 和 `LumenEffectDiagnostics` 全部字段。
+- `LumenEffectLayer(view, options = LumenEffectOptions(), clock = system)`：`update(value)`、`emitBurst(x, y): Int`、`triggerEnergy()`、`pause/resume/clear/advanceFrame/diagnostics/close`。x/y 为宿主 View 内像素，关闭后调用为空操作。
+- `LumenEffectPreset(options = LumenEffectOptions())`：`toJson(): String`、`fromJson(text): LumenEffectPreset`，schema 固定为 1。导出只含参数，不含任意执行代码。
 
-## 17. 统一动画资产（自1.2.1，lumen-assets）
+## 17. 统一动画资产（自 1.2.1，lumen-assets）
 
-包`com.lumen.coacervation.engine.assets`。所有选项／预算见[P2配置](P2_EFFECTS_AND_ASSETS.md)。
+包 `com.lumen.coacervation.engine.assets`。所有选项／预算见 [P2 配置](P2_EFFECTS_AND_ASSETS.md)。
 
-- `LumenAssetOptions`全部构造字段；`LumenAssetSelection(artboard=null,animation=null,stateMachine=null)`；`LumenAssetFormat/Fit/State/Failure`枚举；`LumenAssetInput(name,kind)`、`LumenAssetInputKind { NUMBER,BOOLEAN,TRIGGER }`。
-- `LumenAssetMetadata(format,width,height,durationMs,seekable,decodedImagePixels=0,nativeClock=false,speedControl=true,repeatControl=true,frameRateControl=true,inputs=emptyList())`；`LumenAssetDiagnostics(state,failure,generation,frames,dropped,inFlight,bytes,metadata)`。frames计量成功手动提交，无法统计供应商原生时钟帧。
-- `LumenAssetException(failure)`供工厂明确拒绝原因；`LumenAssetSource.open():InputStream`、`LumenAssetFactory.format/decode(bytes,selection,options)`在会话后台执行，`attach(context,asset,options)`在主线程执行。
-- `LumenDecodedAsset.metadata/close`：可在解析线程或主线程关闭，宿主实现须保证幂等、只释放自己的资源。`LumenAssetPlayer.view/metadata/update/render(progress):Boolean/setPlaying/close`及默认`setNumber/setBoolean/fire`在主线程执行；false表示不支持或未提交。
-- `LumenAssetListener.onState(state,failure)`异步主线程通知；`LumenAssetPlayerFailureListener.onFailure(failure)`和默认`LumenAssetPlayer.setOnFailure(listener?)`供异步Surface回调失败上报，会话再次按代次过滤。
-- `LumenAssetSession(container,options=LumenAssetOptions(),clock=system)`：`setListener`、`load(source,factory,selection=LumenAssetSelection())`、`play/pause/resume`、`seek(progress)`、`update(value)`、`setNumber(name,value):Boolean`、`setBoolean(name,value):Boolean`、`fire(name):Boolean`、`advanceFrame/diagnostics/close`。输入名称1–128字符，progress为0–1有限值。
-- 独立工厂：`assets.lottie.LumenLottieFactory()`、`assets.pag.LumenPagFactory()`、`assets.rive.LumenRiveFactory(context,renderer=LumenRiveRenderer.CANVAS)`，各实现上述统一工厂。`assets.rive.LumenRiveRenderer { CANVAS,GPU }`为引擎自有枚举，默认SDK Canvas后端，GPU需显式选择。公开签名无播放库类型。
+- `LumenAssetOptions` 全部构造字段；`LumenAssetSelection(artboard = null, animation = null, stateMachine = null)`；`LumenAssetFormat/Fit/State/Failure` 枚举；`LumenAssetInput(name, kind)`、`LumenAssetInputKind { NUMBER, BOOLEAN, TRIGGER }`。
+- `LumenAssetMetadata(format, width, height, durationMs, seekable, decodedImagePixels = 0, nativeClock = false, speedControl = true, repeatControl = true, frameRateControl = true, inputs = emptyList())`；`LumenAssetDiagnostics(state, failure, generation, frames, dropped, inFlight, bytes, metadata)`。`frames` 计量成功手动提交，无法统计供应商原生时钟帧。
+- `LumenAssetException(failure)` 供工厂明确拒绝原因；`LumenAssetSource.open(): InputStream`、`LumenAssetFactory.format/decode(bytes, selection, options)` 在会话后台执行，`attach(context, asset, options)` 在主线程执行。
+- `LumenDecodedAsset.metadata/close`：可在解析线程或主线程关闭，宿主实现须保证幂等、只释放自己的资源。`LumenAssetPlayer.view/metadata/update/render(progress): Boolean/setPlaying/close` 及默认 `setNumber/setBoolean/fire` 在主线程执行；false 表示不支持或未提交。
+- `LumenAssetListener.onState(state, failure)` 异步主线程通知；`LumenAssetPlayerFailureListener.onFailure(failure)` 和默认 `LumenAssetPlayer.setOnFailure(listener?)` 供异步 Surface 回调失败上报，会话再次按代次过滤。
+- `LumenAssetSession(container, options = LumenAssetOptions(), clock = system)`：`setListener`、`load(source, factory, selection = LumenAssetSelection())`、`play/pause/resume`、`seek(progress)`、`update(value)`、`setNumber(name, value): Boolean`、`setBoolean(name, value): Boolean`、`fire(name): Boolean`、`advanceFrame/diagnostics/close`。输入名称 1–128 字符，progress 为 0–1 有限值。
+- 独立工厂：`assets.lottie.LumenLottieFactory()`、`assets.pag.LumenPagFactory()`、`assets.rive.LumenRiveFactory(context, renderer = LumenRiveRenderer.CANVAS)`，各实现上述统一工厂。`assets.rive.LumenRiveRenderer { CANVAS, GPU }` 为引擎自有枚举，默认 SDK Canvas 后端，GPU 需显式选择。公开签名无播放库类型。
 
-Rive原生时钟能力边界、PAGFile最终释放方式、供应商解析内存及中断边界属于[P2配置](P2_EFFECTS_AND_ASSETS.md)明确约束，不能把帧率或字节门禁解释为原生运行时的硬实时／内存保证。
+Rive 原生时钟能力边界、PAGFile 最终释放方式、供应商解析内存及中断边界属于 [P2 配置](P2_EFFECTS_AND_ASSETS.md) 明确约束，不能把帧率或字节门禁解释为原生运行时的硬实时／内存保证。
 
 ## 18. 宿主 motion 原语（自1.2.3，lumen-motion）
 
@@ -500,7 +500,7 @@ Rive原生时钟能力边界、PAGFile最终释放方式、供应商解析内存
 |---|---|
 | `LumenViewportContentSource(source: LumenContentSource, regions: (consumer: (View, Float, Float, Float) -> Unit) -> Unit)` | `LumenVersionedContentSource` 的包装器；regions 同步枚举 `surface, insetX, insetY, padding`，单位为该 surface 本地 px；在原来源坐标中求相交区域并集并向外取整，source 的 coordinateView 在包装期间必须稳定 |
 | `LumenViewportContentSource(content: View, regions)` | 同上；使用引擎既有 View 内容源，保留 View 自身滚动的录制语义 |
-| `LumenViewportContentSource(source: LumenContentSource, vararg surfaces: View, paddingPx: Float = 0f)`、`LumenViewportContentSource(content: View, vararg surfaces: View, paddingPx: Float = 0f)`（`@JvmOverloads`，未发布） | 固定表面集合、无内缩、统一模糊余量的简写，与 `regions = { use -> surfaces.forEach { use(it, 0f, 0f, paddingPx) } }` 逐项等价；至少一个表面，`paddingPx` 须有限且非负，否则抛 `IllegalArgumentException`。表面集合会变化或需要内缩时用 regions 构造 |
+| `LumenViewportContentSource(source: LumenContentSource, vararg surfaces: View, paddingPx: Float = 0f)`、`LumenViewportContentSource(content: View, vararg surfaces: View, paddingPx: Float = 0f)`（`@JvmOverloads`，自 1.6.2） | 固定表面集合、无内缩、统一模糊余量的简写，与 `regions = { use -> surfaces.forEach { use(it, 0f, 0f, paddingPx) } }` 逐项等价；至少一个表面，`paddingPx` 须有限且非负，否则抛 `IllegalArgumentException`。表面集合会变化或需要内缩时用 regions 构造 |
 | `LumenViewportContentSource.sync(): Boolean` | 在会话 pre-draw 前显式更新移动区域、模糊余量与代理尺寸；返回裁剪边界是否变化。无有效区域时退回完整来源；provider 异常时暂不可用，之后可再次同步恢复；关闭后返回 false |
 | `LumenViewportContentSource` 来源成员及 `close()` | 暴露稳定 coordinateView、原来源 dependencies、sourceEpoch、contentVersion、availability 与 excludesSurfaces；不通过坐标代理的 dirty 驱动捕获。ViewGroup 使用透明 overlay 坐标代理，普通 View 保留原锚点并裁剪 Canvas；源中全部注入表面须列入 regions，未声明排除表面的源不得包含其表面。close 移除代理，不关闭原来源；关闭后不重新附着或绘制 |
 | `LumenDrawableScene.create(hardware: Boolean, scale: Float = 1f): LumenDrawableScene` | companion 工厂并提供 Java 静态重载；API 29+ 的硬件请求创建 RenderNode 录制场，旧系统回退 Picture。scale 及其倒数须有限，scale 在 `(0, 1]`；只影响硬件材质，软件保持完整分辨率 |
@@ -542,4 +542,13 @@ Rive原生时钟能力边界、PAGFile最终释放方式、供应商解析内存
 | `GlowEngine.setMaterialOpacity(role, value)` | 带默认空实现（等同恒为 1）；契约版本不变 |
 | 实现 `LumenMaterialOpacityTarget` | `LumenSurfaceBinding`（另有 `setMaterialOpacity(value, legibility)`）、`LumenFluentControl`、`LumenPrismGlass`（后两者另有 `setMaterialOpacity(value, legibility)`）、`LumenMicaBackdrop`（始终不透明：0 为纯色底，1 为所配置的云母）、`LumenSlider` / `LumenNavigationBar` / `LumenSegmentScrubBar`（lumen-motion，只作用于槽体或栏背景；数值填充、选中框与文字不变） |
 | `LumenMaterialOpacityScope(initial = 1f, stiffness = 260f, dampingRatio = 0.92f)`（lumen-motion，`motion`） | `register(target, base = 1f)` / `unregister(target, restore = 1f)` / `set(value)` / `animateTo(value)` / `value` / `isAnimating` / `close()`；目标收到 `上一级 × 作用域值 × base`；本身也是 `LumenMaterialOpacityTarget`，可嵌套；系统关闭动画时 `animateTo` 等同 `set` |
+
+## 24. Meguviz 桥（自 1.6.2，lumen-bridge-meguviz-android）
+
+包 `com.lumen.coacervation.engine.bridge.meguviz.android`，完整接入说明与关闭顺序见 [MEGUVIZ_BRIDGE.md](MEGUVIZ_BRIDGE.md)。全部主线程调用。
+
+| 声明 | 说明 |
+|---|---|
+| `Activity.openLumenSurfaces(palette: LumenPalette? = null, options: LumenSurfaceSessionOptions = LumenSurfaceSessionOptions()): LumenSurfaceSession`（`@file:JvmName("LumenMeguvizActivity")`，`@JvmOverloads`） | 打开只读 `WindowSession`（`Permission.OBSERVE`）并交给 `LifecycleAdapters.bindWindow`，返回随窗口会话自动关闭的 `LumenSurfaceSession`；同 Activity 重复调用返回同一会话，参数冲突或非主线程/已销毁/非 `LifecycleOwner` 抛异常；`palette` 为 null 时跟随 `uiMode` 变化 |
+| `WindowSession.openLumenSurfaces(context: Context? = null, palette: LumenPalette? = null, options: LumenSurfaceSessionOptions = LumenSurfaceSessionOptions()): LumenSurfaceSession`（`@file:JvmName("LumenMeguvizWindow")`，`@JvmOverloads`） | 在宿主已管理的 `WindowSession` 上打开 Lumen 局部会话，随窗口会话一同关闭，不重复注册 Activity 回调 |
 

@@ -25,8 +25,8 @@
 宿主**应当**按下面的优先级选一种方式接入：
 
 1. **Maven 坐标**。模块名相同、group 随渠道不同；版本取最新的 Release 或 `CHANGELOG.md`，所选模块**必须**使用同一个版本：
+   - Maven Central：`io.github.jichuo1:<模块>:<版本>`（`1.6.2` 全系列模块及 `lumen-bridge-meguviz-android` 均已发布到 Central；发布流程见 `CENTRAL_PUBLISHING.md`）；
    - JitPack：`com.github.jichuo1.LumenCoacervationEngine:<模块>:<版本>`，仓库 `maven("https://jitpack.io")`；
-   - Maven Central：`io.github.jichuo1:<模块>:<版本>`。不是每个版本都上 Central，以 Central 上实际存在的版本为准（发布流程见 `CENTRAL_PUBLISHING.md`）；
    - 本地仓库：Release 附件 `lumen-maven-<版本>.zip` 解压后的目录，或在本工程运行 `publishAllPublicationsToProjectLocalRepository` 产出的 `build/repo`，group 为 `com.lumen.coacervation.engine`。宿主把这个目录，或任何私有仓库，加进 `repositories` 即可。
 
    模块见 §1.3，`lumen-engine` 必需，其余按需添加：
@@ -69,6 +69,7 @@
 | `lumen-effects` | 可选 | `lumen-motion` | 薄膜、纸张、有限能量与粒子装饰，见 `P2_EFFECTS_AND_ASSETS.md` |
 | `lumen-assets` | 可选 | `lumen-motion` | 动画资产来源、播放会话与生命周期管理 |
 | `lumen-assets-lottie` / `lumen-assets-pag` / `lumen-assets-rive` | 可选 | `lumen-assets` + 对应播放库 | Lottie JSON、PAG 时间线、Rive 画板与状态机输入 |
+| `lumen-bridge-meguviz-android` | 可选 | `lumen-engine`、`meguviz-bom`（window / lifecycle） | 将局部会话生命周期绑定到 MeguvizAndroid 的 `WindowSession`，见 `MEGUVIZ_BRIDGE.md` |
 | `sample` | 参考 | — | 按本标准写的最小接入示例 |
 
 ## 2. Activity 接入
@@ -180,7 +181,7 @@
 
 ### 3.3 内存压力
 
-- （未发布）引擎第一次拿到 Context（`LumenActivityDelegate.prepare()`、`LumenSurfaceSession`、`LumenMicaBackdrop` 创建）时，会在 Application 上自动登记进程级回调，按下面同一门槛调用 `releaseGraphics()`。宿主**不再需要**在 `Application.onTrimMemory` 里转发；已有的转发保持有效，重复释放是空操作。以下条款适用于宿主自己的内存协调器另行调用 `releaseGraphics()` 的情形。
+- 自 1.6.2 起，引擎第一次拿到 Context（`LumenActivityDelegate.prepare()`、`LumenSurfaceSession`、`LumenMicaBackdrop` 创建）时，会在 Application 上自动登记进程级回调，按下面同一门槛调用 `releaseGraphics()`。宿主**不再需要**在 `Application.onTrimMemory` 里转发；已有的转发保持有效，重复释放是空操作。以下条款适用于宿主自己的内存协调器另行调用 `releaseGraphics()` 的情形。
 - `Application.onTrimMemory(level)` 里，**只**在以下两种情况调用 `LumenEngine.releaseGraphics()`：
   - `level == TRIM_MEMORY_RUNNING_CRITICAL`（15）；
   - `level >= TRIM_MEMORY_COMPLETE`（80）。
@@ -277,7 +278,7 @@
 - **可滚动输入框**：`controlOutline()` 作为前景安装时按实际所属 View 的有符号 `scrollX/scrollY` 补偿，只固定描边坐标；原生文本滚动、光标、选区及 padding 不由引擎接管。已有背景继续使用框架自己的滚动补偿，宿主不需要新增滚动监听。
 - **自定义控件**：宿主自己的开关或复选框：
   - **应当**用 `LiquidChoiceDrawable` 画轨道、滑块或勾选框；
-  - 焦点和按压描边用 `controlOutline()`；不经委托、使用宿主自己配色的基类**应当**用 `LumenControlOutline.create(context, accent, radiusDp)`，自定义前景装饰用 `LumenViewportForeground.wrap(drawable)`，不要复制引擎的描边或视口补偿实现（未发布）；
+  - 焦点和按压描边用 `controlOutline()`；不经委托、使用宿主自己配色的基类**应当**用 `LumenControlOutline.create(context, accent, radiusDp)`，自定义前景装饰用 `LumenViewportForeground.wrap(drawable)`，不要复制引擎的描边或视口补偿实现（自 1.6.2 起）；
   - 取色**必须**来自 `LumenPalette`，不得引入新的色源；
   - 替换控件的 Drawable 之后，**必须**调用 `refreshDrawableState()`。否则新 Drawable 会停在默认状态，直到下一次按压才显示正确的选中态。
 
@@ -882,7 +883,7 @@ API 33+ 读取进程当前的公开动画倍率；API 27–32 通过公开系统
 
 | 能力 | 支持的滚动容器 |
 |---|---|
-| 定位高亮（§13.8） | `ScrollView` / `NestedScrollView`，按绝对位置定位；`RecyclerView` 以及其他能竖向滚动的容器，按剩余距离闭环推进，滚到底即停 |
+| 定位高亮（§13.8） | `ScrollView` / `NestedScrollView`，按绝对位置定位；`RecyclerView` 以及其他能竖向滚动的容器，按剩余距离逐步推进，滚到底即停 |
 | 手风琴的视口跟随（§13.7） | `ScrollView` / `NestedScrollView`（单个内容子 View）。`RecyclerView` 条目里不得使用，见 §14.3 |
 | 回弹视口（§5.4） | 只处理竖向。**不应**对横向轮播调用 `installStretch`，它们保留平台自己的横向拉伸效果 |
 | 文字链（§14.4） | 任何能滚动的容器都视为裁剪边界 |
@@ -928,14 +929,14 @@ API 33+ 读取进程当前的公开动画倍率；API 27–32 通过公开系统
 
 ## 16. 局部与注入视效（1.1）
 
-不控制整个Activity时使用LumenSurfaceSession，接线与约束见[SURFACE_SESSIONS.md](SURFACE_SESSIONS.md)。
-不得为了使用局部材质而重建第三方Activity或重挂它的内容；来源必须匹配实际窗口并排除注入表面。
+不控制整个 Activity 时使用 `LumenSurfaceSession`，接线与约束见 [SURFACE_SESSIONS.md](SURFACE_SESSIONS.md)。
+不得为了使用局部材质而重建第三方 Activity 或重挂它的内容；来源必须匹配实际窗口并排除注入表面。
 配置、Hook、业务输入与前景文字由宿主管理，采样、材质与资源生命周期交给会话。
 
 ### 16.1 受控增强（1.2.0）
 
-独立四角、双形状融合、局部按压、光源、渐进模糊及细节质量使用`LumenSurfaceEnhancements`，接线、全部参数和回退见[VISUAL_EFFECTS.md](VISUAL_EFFECTS.md)。
-来源授权和保护状态由宿主显式声明；禁止/独立Surface不得借助回退采样绕过。固定时钟由宿主推进，参数JSON不包含实时输入事件或像素。
-`LumenFusedSelection`只是背景装饰，保留原选项的业务和无障碍语义；有外扩的直接容器显式关闭clipChildren与clipToPadding并留出空间。
+独立四角、双形状融合、局部按压、光源、渐进模糊及细节质量使用 `LumenSurfaceEnhancements`，接线、全部参数和回退见 [VISUAL_EFFECTS.md](VISUAL_EFFECTS.md)。
+来源授权和保护状态由宿主显式声明；禁止/独立 Surface 不得借助回退采样绕过。固定时钟由宿主推进，参数 JSON 不包含实时输入事件或像素。
+`LumenFusedSelection` 只是背景装饰，保留原选项的业务和无障碍语义；有外扩的直接容器显式关闭 `clipChildren` 与 `clipToPadding` 并留出空间。
 
 可选 Rive 运行时在 1.2.6 保留 11.14.0：11.14.1 的四 ABI 原生库新增 ELF TLS，需要 API 29 的动态加载器/libc，清单中的 minSdk 21 无法证明它在 API 27 可运行。最低系统仍为 27，未知 ABI 的原有失败隔离继续有效；不得通过跳过最低系统用例或改用另一架构掩盖退化。官方二进制与平台证据见 `DEPENDENCY_REFRESH_2026_10_11.md`。

@@ -6,6 +6,7 @@
 
 | 文档 | 内容 | 何时更新 |
 |---|---|---|
+| [LumenCoacervationEngine 接入 Skill](../.agents/skills/lumen-coacervation-engine/SKILL.md) | 面向 AI 助手的盘点、选型、最小接入与迁移工作流 | — |
 | [INTEGRATION_STANDARD.md](INTEGRATION_STANDARD.md) | 宿主接入的必须/应当/可以条款；代码和测试按节号引用 | 接入方式或条款变化时；节号只增不改（`VERSIONING.md` §4） |
 | [API.md](API.md) | 受兼容承诺保护的全部公开声明 | 新增或改变公开声明时 |
 | [ENGINEERING_RULES.md](ENGINEERING_RULES.md) | 引擎内部写法规则（隔离类、零分配、线程、失败隔离、测试） | 新的真机教训落成规则时；隔离类表随类增删同步 |
@@ -20,7 +21,7 @@
 |---|---|
 | [SURFACE_SESSIONS.md](SURFACE_SESSIONS.md) | 局部视效会话：来源、采样、位置与滚动通知 |
 | [VIEWPORT_CONTENT_SOURCE.md](VIEWPORT_CONTENT_SOURCE.md) | 小视口来源：区域并集、overlay 坐标、前景探针、反馈拒绝与关闭 |
-| [MEGUVIZ_BRIDGE.md](MEGUVIZ_BRIDGE.md) | 可选 Meguviz 桥（未发布）：为什么只有 MeguvizAndroid 一座、最小接入、本地 staging 构建、联调验证与 Meguviz 侧 Lumen 桥的兼容结果 |
+| [MEGUVIZ_BRIDGE.md](MEGUVIZ_BRIDGE.md) | 可选 Meguviz 桥（自 1.6.2 起提供）：为何仅在 MeguvizAndroid 建桥、最小接入、构建说明、联调验证与 Meguviz 侧 Lumen 桥的兼容边界 |
 | [MATERIAL_OPACITY.md](MATERIAL_OPACITY.md) | 材质浓度：所有控件通用的透明度无极调节（自 1.5.6），含设计、实现取舍与模糊半径方案 |
 | [NATIVE_BACKDROP.md](NATIVE_BACKDROP.md) | 可选原生 backdrop（自 1.6.0）：API 37.2 上的开关、输入语义与适用范围 |
 | [VISUAL_EFFECTS.md](VISUAL_EFFECTS.md) | 局部增强：轮廓、按压、光源、渐进模糊、质量与平台回退 |
@@ -47,9 +48,9 @@
 | [RELEASE_1.5.6_REVIEW.md](RELEASE_1.5.6_REVIEW.md) | 材质浓度发布审阅：默认路径逐位不变、功耗与静止门控、与玻璃区域判定的关系、二进制与 API 级兼容核对，以及审阅中修复的两项问题 |
 | [RELEASE_1.5.5_REVIEW.md](RELEASE_1.5.5_REVIEW.md) | 通用滑块的设计、各材质的实现取舍（Prism 镜片不采样背景）、真机复核与验证边界；多级手风琴首级标题形变修复 |
 | [RELEASE_1.5.4_REVIEW.md](RELEASE_1.5.4_REVIEW.md) | 性能报告复核、等价优化、刷新率自唤醒陷阱、二进制兼容与验证边界 |
-| [ASYNC_PREPARATION_REVIEW_2026_10_23.md](ASYNC_PREPARATION_REVIEW_2026_10_23.md) | 未发布异步 Mica 接口、源码契约索引、缓存正反验证与 API 37 定向设备记录 |
+| [ASYNC_PREPARATION_REVIEW_2026_10_23.md](ASYNC_PREPARATION_REVIEW_2026_10_23.md) | 异步 Mica 接口（1.5.2 前夕审阅）、源码契约索引、缓存正反验证与 API 37 定向设备记录 |
 | [PERFORMANCE_RESEARCH_2026_11_07.md](PERFORMANCE_RESEARCH_2026_11_07.md) | 2026-11-07 渲染性能调研记录（只是调研，不含代码改动；结论按来源标注已验证／理论／传闻） |
-| [RELEASE_1.5.2_REVIEW.md](RELEASE_1.5.2_REVIEW.md) | 屏幕圆角、自定义皮肤动画、异步预处理与门禁索引的发布审阅；替代前一阶段未发布状态 |
+| [RELEASE_1.5.2_REVIEW.md](RELEASE_1.5.2_REVIEW.md) | 屏幕圆角、自定义皮肤动画、异步预处理与门禁索引的发布审阅 |
 | [RELEASE_1.5.3_REVIEW.md](RELEASE_1.5.3_REVIEW.md) | 长文本输入框描边、展开手风琴四向形变、当前页局部外溢及手势回归的发布审阅 |
 | [PORTABILITY_AUDIT.md](PORTABILITY_AUDIT.md) | 1.0.0 从来源工程抽离时的可移植性审查 |
 | [VISUAL_ENHANCEMENT_PLAN.md](VISUAL_ENHANCEMENT_PLAN.md)、[VISUAL_EFFECTS_REVIEW.md](VISUAL_EFFECTS_REVIEW.md) | 1.2.0 视效增强的执行记录与候选阶段 Review |

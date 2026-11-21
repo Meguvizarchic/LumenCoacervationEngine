@@ -4,7 +4,7 @@
 
 `LumenViewportContentSource(source, regions)` 把已有内容源裁为所有取样区域的并集；
 `LumenViewportContentSource(contentView, regions)` 则沿用引擎普通 View 源的自身滚动语义。
-表面固定、无内缩时可直接写 `LumenViewportContentSource(owner, glass, paddingPx = 8f)`（未发布），
+表面固定、无内缩时可直接写 `LumenViewportContentSource(owner, glass, paddingPx = 8f)`（自 1.6.2 起提供），
 与 `LumenViewportContentSource(owner) { use -> use(glass, 0f, 0f, 8f) }` 等价。
 `regions` 同步提供 `(surface, insetX, insetY, padding)`，单位均是 surface 本地像素。
 调用方应在 session 的 pre-draw 前调用 `sync()`，以便同帧更新移动区域及模糊余量。
@@ -37,32 +37,32 @@ mapper 读取代理 matrix 时递归复用同一组 scratch 数组。屏幕上�
 而形成常驻录制循环；普通源保留 dirty/drawingTime 及自身滚动签名。代理 dirty 不参与版本，
 相同 geometry 不重复 layout，也不安装或投递常驻帧回调。
 
-contentVersion 在每次会话 pre-draw 被读取并遍历可见子树（未发布的性能修订）：坐标视图的全局矩阵与逆矩阵
-每次快照只求一次；逐 View 的 inverse·global 乘积留在 FloatArray 上，可见性裁剪用纯 Kotlin 包围盒
+`contentVersion` 在每次会话 pre-draw 被读取并遍历可见子树（自 1.6.2 起优化）：坐标视图的全局矩阵与逆矩阵
+每次快照只求一次；逐 View 的 `inverse · global` 乘积留在 `FloatArray` 上，可见性裁剪用纯 Kotlin 包围盒
 （`SamplingMatrixMath.mapBounds`，分支与 `SkMatrix::mapRect` 一致，透视矩阵退回 `Matrix.mapRect`），
-不再逐 View 经 `Matrix.setValues/mapRect/getValues` 三次 @FastNative JNI。混入签名的 9 个值与原实现逐位相同；
+不再逐 View 经 `Matrix.setValues/mapRect/getValues` 三次 `@FastNative` JNI。混入签名的 9 个值与原实现逐位相同；
 裁剪判断与 Skia 的差别至多在末位舍入，只影响恰好压在视口边缘的 View 是否计入签名。
 设备基准 `ViewportVersionBenchmarkTest`（241 个 View，Xiaomi 2210132C API 33，前后各 3 轮）：单次读取 p50
-212–223µs → 109–130µs；该数字只描述这台设备与该夹具。
-此后（未发布）子 View 的全局矩阵直接由父 View 刚算出的全局矩阵乘以自身 step 求得，公式与运算次序同祖先
-备忘，结果逐位一致，省去逐 View 的 IdentityHashMap 查找、写入与数组拷贝；同一设备与夹具前后各 5 轮：
-p50 111–133µs → 71–88µs，p90 125–149µs → 76–95µs。
+212–223 µs → 109–130 µs。
+同时，子 View 的全局矩阵直接由父 View 刚算出的全局矩阵乘以自身 step 求得，公式与运算次序同祖先
+备忘，结果逐位一致，省去逐 View 的 `IdentityHashMap` 查找、写入与数组拷贝；同一设备与夹具前后各 5 轮：
+p50 111–133 µs → 71–88 µs，p90 125–149 µs → 76–95 µs。
 
 JVM 回归覆盖区域并集、边界裁剪、向外取整、连续移动及上述矩阵等式；源码契约保护 overlay
 可见性、软件探针、依赖和关闭出口。sample Android 回归覆盖 owner 可见性与恢复、带自身滚动
 及偏移/缩放/旋转的像素等价、使用引擎矩阵把裁剪源画回 owner、原生探针与自定义源分离、
 连续移动、source 版本/availability、反馈拒绝、provider/绘制异常恢复以及关闭恢复。
-由于 sample 与 engine 分属不同模块，回归通过反射只访问 internal ViewSamplingMatrix，
+由于 sample 与 engine 分属不同模块，回归通过反射只访问 internal `ViewSamplingMatrix`，
 生产代码无反射。
 
 本能力吸收 LiJiaHua1024 在来源工程 `next` 分支的视口裁剪贡献；具体提交与本次 Apache-2.0 纳入授权事实见 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) 和 [NOTICE](../NOTICE)。宿主的页面、壁纸配方、Hook 和业务 View 识别继续由调用方持有。
 
-建议验证：
+## 验证命令与适用范围
 
 ```powershell
 .\gradlew.bat :lumen-engine:testDebugUnitTest :sample:assembleReleaseAndroidTest :sample:assembleRelease --console=plain --no-daemon
 ```
 
-存在设备时再运行 `:sample:connectedReleaseAndroidTest`，或按类筛选
-`com.lumen.coacervation.sample.ViewportContentSourceTest`。编译 Android 测试不代表像素、
-生命周期、实际采样后端或宿主页面已获得运行验收。
+存在设备时再运行 `:sample:connectedReleaseAndroidTest`，或按类筛选 `com.lumen.coacervation.sample.ViewportContentSourceTest`。
+
+- **适用范围与验证说明**：上述基准数据仅来自 Xiaomi 2210132C（API 33）上的 241 View 固定夹具；编译 Android 测试通过不替代真机像素、生命周期、实际采样后端或宿主业务页面的完整验收。

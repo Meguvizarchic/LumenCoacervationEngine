@@ -1,6 +1,6 @@
 # 构建与门禁工作流
 
-通过准确声明输入、复用已验证产物加速构建。源码、JVM、APK、设备与发布分别验收；缓存命中和 Gradle 退出码不能替代设备结果。
+通过准确声明输入、复用已验证产物加速构建。源码、JVM、APK、设备与发布分别验收。
 
 ## 1. 编译与缓存
 
@@ -42,6 +42,7 @@ API 33／34 使用现有 Mesa `lavapipe` 模拟器图形路径及 `skiagl` HWUI�
 .\gradlew.bat assembleDebug testDebugUnitTest :sample:testReleaseUnitTest lintDebug --console=plain --no-daemon
 # 完整 CI 任务图；PowerShell 下含点的 -P 参数整体加引号。
 .\gradlew.bat assembleDebug testDebugUnitTest :sample:testReleaseUnitTest lintDebug bundleReleaseAar sourceReleaseJar :sample:minifyReleaseWithR8 '-Plumen.verifySampleR8=true' --console=plain --no-daemon
+# 需要一并构建可选 Meguviz 桥与演示页时附加 '-Plumen.meguviz=true'。
 python -m unittest discover -s tools -p 'test_*.py' -v
 # lumen-engine 自带仪器化测试：逐类运行、每类限时、严格解析结果（无 Activity 的测试进程可能被厂商省电挂起）
 python tools/engine_device_tests.py --apk lumen-engine/build/outputs/apk/androidTest/debug/lumen-engine-debug-androidTest.apk --output build/engine-device
@@ -53,10 +54,10 @@ python .github/scripts/run_device_tests.py build/demo-apks --revision (git rev-p
 python .github/scripts/verify-smoke-results.py build/device-results --api 37 --summary
 ```
 
-## 5. 性能与验收边界
+## 5. 性能与适用范围
 
-2026-10-15，本地同一源码、相同完整 CI 任务图和已预热构建缓存的单次对比：关闭配置缓存约 50.2 秒，重用配置缓存约 29.4 秒。该结果衡量 Windows 无变更构建，不代表 hosted 或全量构建的固定加速比例。
+2026-10-15，本地同一源码、相同完整 CI 任务图和已预热构建缓存的单次对比：关闭配置缓存约 50.2 秒，重用配置缓存约 29.4 秒。
 
-20,096 条合成通过用例、5 次中位数：原校验约 28.4ms，新 CI 摘要模式约 26.9ms；Python 跟踪峰值分配约 12.35MB → 7.49MB，成功日志 720,681 → 37 字符。详细输出模式保留逐条日志，新增完整性检查有额外开销。算法基准不替代设备测试耗时。
+20,096 条合成通过用例、5 次中位数：原校验约 28.4 ms，新 CI 摘要模式约 26.9 ms；Python 跟踪峰值分配约 12.35 MB → 7.49 MB，成功日志 720,681 → 37 字符。详细输出模式保留逐条日志，新增完整性检查有额外开销。
 
-工作流变更需通过完整本地门禁、R8、许可证、脚本回归、Actions／Shell 校验与真实设备执行。GitHub 四版本矩阵及 hosted 加速效果仍需远端运行验收。
+- **适用范围与验证说明**：缓存命中或 Gradle 退出码不替代设备实测结果；上述本地构建与脚本耗时仅衡量 Windows 无变更场景和校验算法本身，GitHub 四版本设备矩阵及 hosted CI 加速效果仍需远端实际运行验收。

@@ -34,7 +34,7 @@ Mica 面向整个窗口的底层，使用独立可选入口 `LumenMicaBackdrop`�
 ```
 
 - **API 29+**：亮度层与色调层使用平台 `BlendMode.LUMINOSITY` / `BlendMode.COLOR`，与 W3C 非可分混合公式一致（`LumenAcrylicBlend.EXACT`）。WinUI 源码因 Composition 的枚举命名错误把两者对调，这里还原的是它的**视觉意图**。
-- **API 27–28** 或 `exactBlend = false`：亮度层退化为源覆盖、透明度乘 0.82，色调层为源覆盖（`APPROXIMATE`）。色相保留比精确混合弱，不宣称等价。
+- **API 27–28** 或 `exactBlend = false`：亮度层退化为源覆盖、透明度乘 0.82，色调层为源覆盖（`APPROXIMATE`），色相保留较弱，不保证与精确混合等价。
 - **模糊半径**：WinUI 的 30 是标准差；HWUI 把半径换算为 σ = 0.57735·r + 0.5，σ=30 需要约 51dp，超过会话上限 48dp，所以默认取 48dp（σ≈28.2）。
 - **噪点**：进程共享一张 64×64 ARGB 灰噪图（16 KiB，常量预算，JVM 测试守住），引用计数，最后释放时只丢引用、不 `recycle()`，因为显示列表可能仍在引用像素。
 
@@ -100,12 +100,11 @@ flyout.close(); button.close(); session.close()
 - 文字颜色由宿主负责。Fluent 不建议在亚克力上放强调色文字或超链接；`reduceTransparency` 时控件为不透明回退色。
 - 焦点双环只在非触摸模式（键盘、方向键）下显示，画在控件边界内侧；输入框等自带焦点样式的控件可关闭 `focusVisualEnabled`。
 
-## 6. 验证
+## 6. 验证与适用范围
 
 - `FluentAcrylicPolicyTest`：配方数值逐项按 WinUI 公式手算；修正系数、亮度推导、默认值、回退优先级、过渡打断、可用性滞回、参数边界。
 - `FluentControlContractTest`：噪点预算与确定性、不回收共享位图、`BlendMode` 只出现在 API ≥ 29 的隔离类、绘制路径零分配、先画不透明底再画背景、录制期间不画绑定、只恢复自己持有的状态、监听都有移除路径、预算超限局部降级、同来源共用录制。
-- `AcrylicBackdropContractTest` 和 `AcrylicBackdropColorTest`：守住内部保色接线与旧公开采样 ABI；设备像素对照关闭额外色调／亮度／噪点的亚克力和普通 FROSTED，检查两种浅色、主题／选项更新和重绑。软件在所有 smoke API 必测，GPU 在 API 31+ 必测；运行结果以对应版本发布审阅和验证附件为准。
+- `AcrylicBackdropContractTest` 和 `AcrylicBackdropColorTest`：守住内部保色接线与旧公开采样 ABI；设备像素对照关闭额外色调／亮度／噪点的亚克力和普通 `FROSTED`，检查两种浅色、主题/选项更新和重绑（软件覆盖所有 smoke API，GPU 覆盖 API 31+）。
 - `sample` 的“表面沙盒 → Fluent 亚克力与层级”页面可以手动切换全部开关并查看诊断。
 - `FluentControlIntegrationTest`（sample 设备测试，CI 在 API 27/31/33/34 模拟器运行）：安装/关闭只恢复自己持有的背景、内边距与高度；按压降低高度；回退原因与混合模式选择；降低透明度时为不透明回退色；背景采样后淡入亚克力；单色描边保持令牌透明度。
-- 1.4.3 发布前在 OPPO PMA110（Android 17 / API 37，Adreno）上运行以上 6 项全部通过，并人工核对浅色、深色、降低透明度、BASE/ACCENT 与滚动跟随画面；后端为 GPU、混合为 EXACT。
-- 其他厂商 GPU 的高级混合模式、阴影观感与真实功耗仍需在目标设备上验收；混合异常时可对该控件设置 `exactBlend = false`。
+- **适用范围与验证说明**：以上 6 项在 1.4.3 发布前于 OPPO PMA110（Android 17 / API 37，Adreno，GPU 后端，`EXACT` 混合）全部通过；其他厂商 GPU 的高级混合模式、阴影观感与真实功耗仍需在目标设备上验收，混合异常时可对该控件设置 `exactBlend = false`。

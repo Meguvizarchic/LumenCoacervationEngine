@@ -81,8 +81,9 @@ navigationBar.setPrismSelection(LumenPrismSelectionOptions())   // null = 经典
 
 `LumenPrismGlass.diagnostics()` 返回 `LumenPrismDiagnostics(closed, glassVisible, fallbackReason, backdropBackend, lensActive, dark, draws)`：`lensActive` 为 true 表示折射在 GPU 效果链里（API 33+、折射开启、采样走 GPU）。`LumenNavigationBar.isPrismSelectionEnabled` 报告选中框模式。
 
-## 6. 验证
+## 6. 验证与适用范围
 
 - JVM：`PrismPolicyTest`（深浅色默认值、回退色、饱和度矩阵、折射剖面、法线与高光强度、半径与预算）、`PrismContractTest`（隔离、绘制零分配、上游署名、会话链、阴影与背景所有权）、`NavigationBarPrismTest`（速度挤压、遮罩与阴影预算、经典路径不变、帧源不碰光晕与宿主、遮罩只取覆盖度）。
-- 设备：`PrismIntegrationTest`——两种深浅色下的回退色与"背景 ⊕ 40% 表面色"像素合成、`close()` 恢复背景、经典选中框在棱镜往返后逐像素不变、选中色只出现在选中框内。
+- 设备：`PrismIntegrationTest`——两种深浅色下的回退色与“背景 ⊕ 40% 表面色”像素合成、`close()` 恢复背景、经典选中框在棱镜往返后逐像素不变、选中色只出现在选中框内。
 - Demo：「排布 → 局部视效调节实验室 → Prism 棱镜玻璃与液态选中框」提供全部开关与滑块、深浅色与浅色背景内容切换；设置页「棱镜选中框（重建）」把 Demo 底栏切到液态选中框。
+- **适用范围**：折射、色散与角度高光依赖 API 33+；API 31–32 保留饱和度与模糊，API 27–30 走会话软件模糊，外阴影需 API 28+。

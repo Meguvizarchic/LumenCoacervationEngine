@@ -1,12 +1,14 @@
 # 发布到 Maven Central
 
-本引擎目前通过 JitPack（`com.github.jichuo1.LumenCoacervationEngine:<模块>:<版本>`）和 Release 附件里的 Maven 仓库压缩包（`com.lumen.coacervation.engine`）分发。Maven Central 是第三条渠道，坐标用已验证的命名空间 `io.github.jichuo1`：
+本引擎通过 Maven Central（`io.github.jichuo1:<模块>:<版本>`）、JitPack（`com.github.jichuo1.LumenCoacervationEngine:<模块>:<版本>`）以及 Release 附件中的本地仓库包（`com.lumen.coacervation.engine:<模块>:<版本>`）分发。自 `1.6.2` 起，全套核心/扩展模块及可选 `lumen-bridge-meguviz-android` 均已发布到 Maven Central（使用已验证的命名空间 `io.github.jichuo1`）：
 
 ```kotlin
-implementation("io.github.jichuo1:lumen-engine:<版本>")
+implementation("io.github.jichuo1:lumen-engine:1.6.2")
 ```
 
 仓库里的源码、默认 `lumen.group` 和 JitPack 坐标都不变；Central 的坐标只在构建时用 `-Plumen.group=io.github.jichuo1` 覆盖。
+
+> **工具边界**：`tools/central_bundle.py` 的 `MODULES` 当前默认打包 9 个不依赖 Meguviz 的模块（`lumen-engine`、`lumen-motion`、`lumen-controls`、`lumen-compose`、`lumen-effects`、`lumen-assets`、`lumen-assets-lottie`、`lumen-assets-pag`、`lumen-assets-rive`）；可选桥 `lumen-bridge-meguviz-android` 须额外打开 `-Plumen.meguviz=true` 构建并单独发布。
 
 ## 分工
 
@@ -33,24 +35,24 @@ implementation("io.github.jichuo1:lumen-engine:<版本>")
 1. 运行 `Central bundle` 工作流（只能在 main 上）：
 
    ```bash
-   gh workflow run central-bundle.yml --repo jichuo1/LumenCoacervationEngine -f tag=1.6.1
+   gh workflow run central-bundle.yml --repo jichuo1/LumenCoacervationEngine -f tag=1.6.2
    ```
 
    默认 `group=io.github.jichuo1`。它会从 tag 检出源码、运行本工具的单元测试、构建九个模块、打包并校验，上传 artifact `central-bundle-<tag>`（保留 14 天）。
 2. 下载未签名的 bundle：
 
    ```bash
-   gh run download <run-id> --repo jichuo1/LumenCoacervationEngine -n central-bundle-1.6.1
+   gh run download <run-id> --repo jichuo1/LumenCoacervationEngine -n central-bundle-1.6.2
    ```
 
 3. 在本机签名（需要 GnuPG；口令由 gpg-agent 向你询问）：
 
    ```bash
-   python tools/central_bundle.py sign --bundle lumen-central-1.6.1-unsigned.zip --group io.github.jichuo1 --tag 1.6.1 --key <KEYID或邮箱> --output lumen-central-1.6.1-signed.zip
+   python tools/central_bundle.py sign --bundle lumen-central-1.6.2-unsigned.zip --group io.github.jichuo1 --tag 1.6.2 --key <KEYID或邮箱> --output lumen-central-1.6.2-signed.zip
    ```
 
    签完会用 `gpg --verify` 逐个核对 `.asc`，并打印所用密钥的指纹。
-4. 在 Central Portal 的 Publish 页上传 `lumen-central-1.6.1-signed.zip`，等校验通过后发布。
+4. 在 Central Portal 的 Publish 页上传 `lumen-central-1.6.2-signed.zip`，等校验通过后发布。
 
 ## bundle 的内容
 
@@ -60,11 +62,11 @@ implementation("io.github.jichuo1:lumen-engine:<版本>")
 - `<模块>-<版本>.pom`：Gradle 生成的 POM 加上 `url`、`developers`、`scm`，其余逐字保留（包括 Gradle 使用者靠它优先读取 `.module` 的标记注释）；
 - `<模块>-<版本>-javadoc.jar`：占位包。库是 Kotlin 写的，不生成 Javadoc；包里的 `README.txt` 指向该 tag 的 `docs/API.md`。Sonatype 允许占位包通过校验。
 
-九个模块必须一起上传。依赖其他模块的 POM 里，模块间依赖的 groupId 都是 `io.github.jichuo1`。
+`tools/central_bundle.py` 打包的九个模块须一起上传；依赖其他模块的 POM 里，模块间依赖的 groupId 都是 `io.github.jichuo1`。可选 `lumen-bridge-meguviz-android` 在启用 `-Plumen.meguviz=true` 后可按同样规范单独发布到 `io.github.jichuo1`。
 
 ## 限制与边界
 
 - 已发布到 Central 的组件不能修改，修复要发新版本（Sonatype 的政策）。上传前先确认 tag 与版本。
 - Central 坐标与 Release 附件里的 `lumen-maven-<版本>.zip` 是同一 tag 的两次独立构建，字节不保证相同。
 - 本工具与工作流只覆盖 bundle 的生成、校验与签名；上传到 Central 需要你的 Portal 账号，我们没有自动化它，也不存放 Portal Token。
-- 工作流的 PR 演练用已发布的 1.6.0 tag 验证流程本身，并不代表 1.6.0 应该发到 Central。
+- 工作流的 PR 演练可使用已发布的 tag 验证流程本身。

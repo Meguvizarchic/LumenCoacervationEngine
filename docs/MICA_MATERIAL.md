@@ -17,7 +17,7 @@ Mica 是窗口的基础层：将背景图的低频色彩融入不透明表面，
 | [WinUI `Common_themeresources_any.xaml`](https://github.com/microsoft/microsoft-ui-xaml/blob/main/controls/dev/CommonStyles/Common_themeresources_any.xaml) | 直接核对 Base、BaseAlt 的回退色，以及内容层、Alt 命令层的 ARGB 令牌，见下表。 |
 | [Android `WallpaperManager`](https://developer.android.com/reference/android/app/WallpaperManager) | Android 13 普通应用不能可靠取得当前壁纸，Android 14 起 `getDrawable()` 会抛权限异常；引擎不读取壁纸、不请求存储或所有文件权限，由宿主明确提供背景。 |
 
-公开材料不足以证明 Windows Mica 的完整默认合成配方。因此本实现是**遵循 Mica 用途与行为的 Android 适配**：保留静态背景的空间色彩、不透明输出、主题、分层及策略回退；不宣称与 DWM 逐像素等价，也不宣称具有 Windows 多屏壁纸坐标跟随能力。
+公开材料不足以证明 Windows Mica 的完整默认合成配方。本实现属于遵循 Mica 用途与行为的 Android 适配：保留静态背景的空间色彩、不透明输出、主题、分层及策略回退，不具备 Windows 多屏壁纸坐标跟随，也不承诺与 DWM 逐像素等价。
 
 ## 2. 配方与预算
 
@@ -108,11 +108,11 @@ preparer.close()
 
 窗口焦点监听和省电广播只在 View 挂载期间注册，detach／close 时移除，reattach 后重新注册并立即读取状态。低内存设备使用 `ActivityManager.isLowRamDevice`。静态快照无需因为一次失焦反复释放／重建。背景着色或 Shader 分配失败时局部回退为 `RENDER_UNAVAILABLE`，普通重绘不会重试分配。
 
-## 5. 验证与演示
+## 5. 验证、演示与适用范围
 
 - `MicaPolicyTest` 覆盖官方颜色、输入边界、极端纵横比预算、纯色合成端点、Alt 的色彩差异、始终不透明及回退优先级。
 - `MicaContractTest` 覆盖绘制路径无采集／模糊／分配、后台准备、输入归属、监听释放、内存回收和无隐藏 API。
 - `MicaIntegrationTest` 覆盖真实 Bitmap 输出、输入回收后快照独立性、主线程拒绝预处理、明暗主题回退、内容层令牌、资源释放与恢复、根背景归属、真实 Dialog 失焦与恢复、PixelCopy 窗口 GPU 输出。
-- `LatestPreparationTest` 验证有界任务/结果队列、取消、关闭、跨线程代次、执行器拒绝与回调失败；`MicaPreparerIntegrationTest` 在设备侧验证输入所有权、同步/异步像素一致、关闭后快照可用、失败回调与重用，三项均登记为各 API smoke 必测用例。编译通过不等于设备执行通过。
+- `LatestPreparationTest` 验证有界任务/结果队列、取消、关闭、跨线程代次、执行器拒绝与回调失败；`MicaPreparerIntegrationTest` 在设备侧验证输入所有权、同步/异步像素一致、关闭后快照可用、失败回调与重用，三项均登记为各 API smoke 必测用例。
 - Demo 入口：**表面沙盒 → Mica 云母与内容分层**。可以开关材质、BaseAlt、深色、高对比度、降低透明度、降低动态效果、失焦回退，并更换静态背景。
-- 本地构建、JVM、设备及跨版本结果须分别记录；添加测试不等于所有 API 或厂商设备已经通过。功耗、不同壁纸可读性和目标 ROM 视觉观感仍需要目标场景验收。
+- **适用范围与验证说明**：上述 72 KiB 仅为当前持有量（不含切换瞬间的显存与 GC 残留）；本地构建、JVM 与模拟器验证不能替代全部目标真机与厂商 ROM 上的功耗和壁纸可读性验收。

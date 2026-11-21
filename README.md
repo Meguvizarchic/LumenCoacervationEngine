@@ -21,13 +21,15 @@
 
 ## 快速接入
 
-Maven Central 上的 `1.6.2` 支持 Android 8.1 及以上（API 27），应用编译使用 Android SDK 37 或更高版本。所选的 Lumen 模块使用同一版本。
+Maven Central 上的 `1.6.2` 支持 Android 8.1 及以上（API 27），应用编译使用 Android SDK 37 或更高版本。所选的 Lumen 模块使用同一版本（`lumen-*` 不在 `meguviz-bom:1.2.0` 管理列表内；使用 `lumen-bridge-meguviz-android:1.6.2` 时再配合引入 `io.github.jichuo1.meguviz:meguviz-bom:1.2.0`）。
 
 ```kotlin
 dependencies {
     implementation("io.github.jichuo1:lumen-engine:1.6.2")
 }
 ```
+
+> AI 编程助手接入与迁移指引见 [LumenCoacervationEngine 接入 Skill](.agents/skills/lumen-coacervation-engine/SKILL.md)。
 
 | 按需添加的模块 | 用途 |
 | --- | --- |
@@ -36,7 +38,7 @@ dependencies {
 | `lumen-effects` | 表面装饰、粒子和光源效果 |
 | `lumen-assets` | 动画资产的读取、播放与生命周期管理 |
 | `lumen-assets-lottie`、`lumen-assets-pag`、`lumen-assets-rive` | 对应动画格式的播放 |
-| `lumen-compose` | Compose 局部材质和长按弹性 |
+| `lumen-compose` | Compose 局部材质和长按弹性（局部原型） |
 | `lumen-bridge-meguviz-android` | 接入 MeguvizAndroid 的窗口与生命周期组件 |
 
 只给顶栏、浮层或卡片添加材质时，可在 Activity 中创建局部会话，并在刷新时调用 `ensure`。
@@ -50,9 +52,10 @@ lumen.ensure(topBar, LumenSurfacePresets.floating(), source = content)
 
 ## 文档
 
-- [API](docs/API.md)与[局部视效参数](docs/VISUAL_EFFECTS.md)
-- [动画资产](docs/P2_EFFECTS_AND_ASSETS.md)与 [Compose 适用范围](docs/NATIVE_COMPOSE.md)
-- [文档索引](docs/README.md)与[更新记录](CHANGELOG.md)
+- [LumenCoacervationEngine 接入 Skill](.agents/skills/lumen-coacervation-engine/SKILL.md)
+- [API](docs/API.md) 与 [局部视效参数](docs/VISUAL_EFFECTS.md)
+- [动画资产](docs/P2_EFFECTS_AND_ASSETS.md) 与 [Compose 适用范围](docs/NATIVE_COMPOSE.md)
+- [Meguviz 桥接入](docs/MEGUVIZ_BRIDGE.md) · [文档索引](docs/README.md) · [更新记录](CHANGELOG.md)
 - [提交问题](https://github.com/Meguvizarchic/LumenCoacervationEngine/issues)
 
 ## 出处与许可
